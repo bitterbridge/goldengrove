@@ -2,8 +2,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import { parseDescriptor } from '../sim/parse';
 import type { Sim } from '../sim/wasm';
+import { bodyLayout, parentIndex } from '../sim/layout';
 import { buildSpaceScene } from './space';
 
 const goldenPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../crates/gg-gen/tests/golden/seed-42.json');
@@ -64,5 +66,46 @@ describe('buildSpaceScene', () => {
     const view = buildSpaceScene(sim);
     expect(view.bodyIndexOf(view.bodies[3]!)).toBe(3);
     expect(view.bodyIndexOf(view.scene)).toBeNull();
+  });
+
+  it('rescales orbit lines on trueScale flips and keeps followers in sync', () => {
+    const sim = fakeSim();
+    const view = buildSpaceScene(sim);
+    const states = sim.statesAt(0);
+    view.update(states, false);
+
+    const lines = view.scene.getObjectByName('orbit-lines')!;
+    const firstLine = lines.children[0] as THREE.LineLoop;
+    const attr = (firstLine.geometry as THREE.BufferGeometry).getAttribute('position');
+    const compressedX = attr.getX(1);
+    expect(Number.isFinite(compressedX)).toBe(true);
+    expect(compressedX).not.toBe(0); // first frame wrote vertices
+
+    view.update(states, true); // flip to true scale
+    const trueX = attr.getX(1);
+    expect(trueX).not.toBeCloseTo(compressedX, 6); // vertices rewritten
+
+    view.update(states, false); // flip back
+    expect(attr.getX(1)).toBeCloseTo(compressedX, 6);
+
+    // star point-light follows its star mesh
+    let lightChecked = false;
+    view.scene.traverse((o) => {
+      const follows = (o as THREE.PointLight & { __followsBody?: number }).__followsBody;
+      if (follows !== undefined) {
+        expect(o.position.distanceTo(view.bodies[follows]!.position)).toBeLessThan(1e-9);
+        lightChecked = true;
+      }
+    });
+    expect(lightChecked).toBe(true);
+
+    // a moon's orbit line rides its planet's view position
+    const layout = bodyLayout(golden);
+    const moonIdx = layout.findIndex((r) => r.kind === 'moon');
+    if (moonIdx >= 0) {
+      const moonLine = lines.children.find((c) => c.name === `orbit-${moonIdx}`)!;
+      const parentIdx = parentIndex(layout, golden, moonIdx)!;
+      expect(moonLine.position.distanceTo(view.bodies[parentIdx]!.position)).toBeLessThan(1e-9);
+    }
   });
 });
