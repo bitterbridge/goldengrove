@@ -57,6 +57,10 @@ impl RngStream {
     }
 
     pub fn pick_count(&mut self, lo: usize, hi: usize) -> usize {
-        self.rng.gen_range(lo..=hi)
+        // Width-independent: sample a full u64 so 32-bit (wasm32) and 64-bit
+        // targets consume the stream identically. Modulo bias is ~span/2^64 —
+        // irrelevant for the tiny spans we draw (and determinism is what matters).
+        let span = (hi - lo + 1) as u64;
+        lo + (self.rng.gen::<u64>() % span) as usize
     }
 }
