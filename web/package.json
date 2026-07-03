@@ -1,0 +1,22 @@
+{
+  "name": "goldengrove-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "build:wasm": "wasm-pack build ../crates/gg-wasm --target web --out-dir ../../web/src/wasm/pkg"
+  },
+  "dependencies": {
+    "three": "^0.166.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "@types/three": "^0.166.0",
+    "happy-dom": "^15.0.0",
+    "typescript": "~5.5.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}
