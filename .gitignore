@@ -22,3 +22,6 @@ target
 
 # Superpowers brainstorm sessions
 .superpowers/
+
+# Generated WASM package (rebuild: npm run build:wasm in web/)
+web/src/wasm/pkg/

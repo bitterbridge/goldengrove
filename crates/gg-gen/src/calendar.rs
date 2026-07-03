@@ -1,7 +1,9 @@
 use crate::descriptor::{Calendar, LeapRule, LeapTerm, MonthCycle, Planet};
 use gg_core::consts::G;
 use gg_core::orbit::orbital_period_s;
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct DateTime {
     pub year: u64,
     pub day_of_year: u32,
