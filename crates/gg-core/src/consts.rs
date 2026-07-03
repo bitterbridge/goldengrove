@@ -11,3 +11,6 @@ pub const M_EARTH: f64 = 5.9722e24; // kg
 pub const R_EARTH: f64 = 6.371e6; // m
 pub const DAY: f64 = 86_400.0; // s
 pub const YEAR: f64 = 3.155_815e7; // s (sidereal year)
+/// Round-number year (s) for astrophysical scalings (lifetimes, ages, doom
+/// clocks). Deliberately distinct from YEAR (sidereal); do not swap them.
+pub const YEAR_APPROX: f64 = 3.156e7;

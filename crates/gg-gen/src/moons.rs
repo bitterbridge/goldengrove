@@ -190,7 +190,7 @@ pub fn generate_moons(
         .iter()
         .filter_map(|m| m.doom_time_s)
         .fold(f64::INFINITY, f64::min);
-    if soonest_doom < 1e8 * 3.156e7 {
+    if soonest_doom < 1e8 * YEAR_APPROX {
         match planet.state {
             WorldState::Living => planet.state = WorldState::Doomed { doom_time_s: soonest_doom },
             WorldState::Doomed { doom_time_s } if soonest_doom < doom_time_s => {

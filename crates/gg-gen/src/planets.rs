@@ -129,10 +129,10 @@ fn roll_anchor_state(rng: &mut RngStream, ctx: &StellarContext) -> WorldState {
         // Doomed: star death if the primary is near the end of the main
         // sequence, otherwise a runaway-greenhouse countdown.
         let star_remaining = ctx.primary_ms_lifetime_s - ctx.age_s;
-        let doom_time_s = if star_remaining < 2e9 * 3.156e7 {
+        let doom_time_s = if star_remaining < 2e9 * YEAR_APPROX {
             star_remaining
         } else {
-            rng.log_uniform(1e4, 1e7) * 3.156e7
+            rng.log_uniform(1e4, 1e7) * YEAR_APPROX
         };
         WorldState::Doomed { doom_time_s }
     }

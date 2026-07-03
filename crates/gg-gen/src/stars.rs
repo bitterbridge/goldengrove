@@ -36,7 +36,7 @@ pub fn temperature_k(luminosity_w: f64, radius_m: f64) -> f64 {
 
 /// Main-sequence lifetime ~ 10 Gyr · (M/M_sun)^-2.5.
 pub fn ms_lifetime_s(mass_kg: f64) -> f64 {
-    10e9 * 3.156e7 * (mass_kg / M_SUN).powf(-2.5)
+    10e9 * YEAR_APPROX * (mass_kg / M_SUN).powf(-2.5)
 }
 
 fn make_star(mass_kg: f64, orbit: Option<OrbitalElements>) -> Star {
@@ -103,7 +103,7 @@ pub fn generate_stars(rng: &mut RngStream) -> StarsOutput {
     // System age: old enough to be settled, young enough that the primary
     // is still on the main sequence (doomed-star systems get close to the end).
     let lifetime = stars[0].main_sequence_lifetime_s;
-    let age_s = rng.uniform(0.1, 0.97) * lifetime.min(12e9 * 3.156e7);
+    let age_s = rng.uniform(0.1, 0.97) * lifetime.min(12e9 * YEAR_APPROX);
 
     StarsOutput { stars, planet_host, age_s }
 }
