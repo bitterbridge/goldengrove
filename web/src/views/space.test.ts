@@ -8,6 +8,7 @@ import type { Sim } from '../sim/wasm';
 import { bodyLayout, parentIndex } from '../sim/layout';
 import { buildSpaceScene } from './space';
 import { compressPosition } from './compression';
+import { AU_M } from '../sim/types';
 
 const goldenPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../crates/gg-gen/tests/golden/seed-42.json');
 const golden = parseDescriptor(readFileSync(goldenPath, 'utf8'));
@@ -46,8 +47,8 @@ function fakeSim(): Sim {
  * Like fakeSim(), but the close stellar pair (stars 0 and 1) sits tens of
  * AU from the world origin — mirrors a trinary system where the wide
  * companion's recoil displaces the planet host (the barycenter of the
- * close pair) away from the origin. Planets keep the same spread as
- * fakeSim() so orbit-line assertions stay comparable.
+ * close pair) away from the origin. Planets sit at whole-AU offsets from
+ * the pair (first planet at +1 AU) so local-structure assertions are easy.
  */
 function fakeSimWithDisplacedStars(): Sim {
   const layoutLen =
@@ -60,7 +61,8 @@ function fakeSimWithDisplacedStars(): Sim {
     statesAt: (tS) => {
       const out = new Float64Array(layoutLen * 7);
       for (let i = 0; i < layoutLen; i++) {
-        out[i * 7] = (i + 1) * 1e10 + tS * 0; // spread bodies on +X (planets/moons)
+        // planets/moons: STAR_OFFSET + whole AU on +X (first planet at +1 AU)
+        out[i * 7] = STAR_OFFSET[0] + (i - 1) * AU_M + tS * 0;
         out[i * 7 + 5] = 1; // spin axis +Z
       }
       // stars 0 and 1: both near the offset, ~1 meter apart
@@ -154,7 +156,7 @@ describe('buildSpaceScene', () => {
     }
   });
 
-  it('planet orbit lines and camera origin follow the displaced stellar host (trinary framing)', () => {
+  it('compresses positions relative to the displaced stellar host (trinary framing)', () => {
     const sim = fakeSimWithDisplacedStars();
     const view = buildSpaceScene(sim);
     const states = sim.statesAt(0);
@@ -171,27 +173,53 @@ describe('buildSpaceScene', () => {
       w0 * states[1]! + w1 * states[8]!,
       w0 * states[2]! + w1 * states[9]!,
     ];
+    const originView = compressPosition(originM[0], originM[1], originM[2], false);
 
-    const expectedOriginView = compressPosition(originM[0], originM[1], originM[2], false);
     const actualOriginView = view.hostOriginView();
-    expect(actualOriginView[0]).toBeCloseTo(expectedOriginView[0], 4);
-    expect(actualOriginView[1]).toBeCloseTo(expectedOriginView[1], 4);
-    expect(actualOriginView[2]).toBeCloseTo(expectedOriginView[2], 4);
+    expect(actualOriginView[0]).toBeCloseTo(originView[0], 4);
+    expect(actualOriginView[1]).toBeCloseTo(originView[1], 4);
+    expect(actualOriginView[2]).toBeCloseTo(originView[2], 4);
 
-    // first planet's orbit line renders at raw path + host origin, not raw alone
+    // star and planet meshes: originView + compressPosition(offset from origin)
+    const pIdx = golden.stars.length; // first planet body index
+    for (const i of [0, 1, pIdx]) {
+      const off = compressPosition(
+        states[i * 7]! - originM[0],
+        states[i * 7 + 1]! - originM[1],
+        states[i * 7 + 2]! - originM[2],
+        false,
+      );
+      expect(view.bodies[i]!.position.x).toBeCloseTo(originView[0] + off[0], 4);
+      expect(view.bodies[i]!.position.y).toBeCloseTo(originView[1] + off[1], 4);
+      expect(view.bodies[i]!.position.z).toBeCloseTo(originView[2] + off[2], 4);
+    }
+
+    // local structure survives displacement: a planet 1 AU from the pair
+    // must render well clear of it (absolute-compression crushed this to
+    // under a view unit at ~3 AU displacement).
+    expect(view.bodies[pIdx]!.position.distanceTo(view.bodies[0]!.position)).toBeGreaterThanOrEqual(2);
+
+    // planet orbit line: vertices are plain compressPosition(raw) (path is
+    // host-relative); the line object itself rides originView.
     const lines = view.scene.getObjectByName('orbit-lines')!;
     const firstLine = lines.children[0] as THREE.LineLoop;
     const raw = (firstLine as THREE.LineLoop & { __rawPath?: Float64Array }).__rawPath!;
     const attr = (firstLine.geometry as THREE.BufferGeometry).getAttribute('position');
 
-    let expected = compressPosition(raw[0]! + originM[0], raw[1]! + originM[1], raw[2]! + originM[2], false);
+    expect(firstLine.position.x).toBeCloseTo(originView[0], 4);
+    expect(firstLine.position.y).toBeCloseTo(originView[1], 4);
+    expect(firstLine.position.z).toBeCloseTo(originView[2], 4);
+    let expected = compressPosition(raw[0]!, raw[1]!, raw[2]!, false);
     expect(attr.getX(0)).toBeCloseTo(expected[0], 4);
     expect(attr.getY(0)).toBeCloseTo(expected[1], 4);
     expect(attr.getZ(0)).toBeCloseTo(expected[2], 4);
 
-    // flip trueScale: vertex updates using the same origin, true-scale compression
+    // flip trueScale: vertices rewrite with true-scale compression and the
+    // line follows the true-scale originView
     view.update(states, true);
-    expected = compressPosition(raw[0]! + originM[0], raw[1]! + originM[1], raw[2]! + originM[2], true);
+    const originViewTrue = compressPosition(originM[0], originM[1], originM[2], true);
+    expect(firstLine.position.x).toBeCloseTo(originViewTrue[0], 4);
+    expected = compressPosition(raw[0]!, raw[1]!, raw[2]!, true);
     expect(attr.getX(0)).toBeCloseTo(expected[0], 4);
     expect(attr.getY(0)).toBeCloseTo(expected[1], 4);
     expect(attr.getZ(0)).toBeCloseTo(expected[2], 4);

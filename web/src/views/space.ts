@@ -116,7 +116,7 @@ export function buildSpaceScene(sim: Sim): SpaceView {
     meta.push(m);
   });
 
-  function writeOrbitLine(m: BodyMeta, trueScale: boolean, originM: [number, number, number]): void {
+  function writeOrbitLine(m: BodyMeta, trueScale: boolean): void {
     const line = m.orbitLine;
     if (!line) return;
     const raw = (line as THREE.LineLoop & { __rawPath?: Float64Array }).__rawPath!;
@@ -127,12 +127,9 @@ export function buildSpaceScene(sim: Sim): SpaceView {
         const f = trueScale ? moonViewFactor(0, true) : m.moonFactor;
         [x, y, z] = [raw[k * 3]! * f, raw[k * 3 + 1]! * f, raw[k * 3 + 2]! * f];
       } else {
-        [x, y, z] = compressPosition(
-          raw[k * 3]! + originM[0],
-          raw[k * 3 + 1]! + originM[1],
-          raw[k * 3 + 2]! + originM[2],
-          trueScale,
-        );
+        // Planet paths are already host-relative; the line object itself
+        // rides originView (set every frame in update()).
+        [x, y, z] = compressPosition(raw[k * 3]!, raw[k * 3 + 1]!, raw[k * 3 + 2]!, trueScale);
       }
       attr.setXYZ(k, x, y, z);
     }
@@ -140,24 +137,35 @@ export function buildSpaceScene(sim: Sim): SpaceView {
   }
 
   let lastTrueScale: boolean | null = null;
-  let lastOriginM: [number, number, number] | null = null;
-  const ORIGIN_REWRITE_THRESHOLD_M = 1e8; // ~0.0007 AU
+  let lastOriginView: [number, number, number] = [0, 0, 0];
 
   function update(states: Float64Array, trueScale: boolean): void {
     const rescale = trueScale !== lastTrueScale;
     lastTrueScale = trueScale;
+    // Host-origin-centric compression: compress each body's OFFSET from the
+    // host origin, then translate by the compressed origin. Systems
+    // displaced from the world origin (trinary recoil) keep their local
+    // structure readable instead of being crushed by the asinh slope out
+    // there. For originM ≈ 0 and for true scale (linear, additive) this
+    // matches the old absolute behavior exactly.
     const originM = hostOriginM(sim, states);
-    const originMoved =
-      lastOriginM === null ||
-      Math.hypot(originM[0] - lastOriginM[0], originM[1] - lastOriginM[1], originM[2] - lastOriginM[2]) >
-        ORIGIN_REWRITE_THRESHOLD_M;
-    const rewriteOrbitLines = rescale || originMoved;
+    const originView = compressPosition(originM[0], originM[1], originM[2], trueScale);
+    lastOriginView = originView;
     // planets/stars first so moon parents are already placed
     meta.forEach((m, i) => {
       if (m.ref.kind === 'moon') return;
-      const [x, y, z] = compressPosition(states[i * 7]!, states[i * 7 + 1]!, states[i * 7 + 2]!, trueScale);
-      bodies[i]!.position.set(x, y, z);
+      const [x, y, z] = compressPosition(
+        states[i * 7]! - originM[0],
+        states[i * 7 + 1]! - originM[1],
+        states[i * 7 + 2]! - originM[2],
+        trueScale,
+      );
+      bodies[i]!.position.set(originView[0] + x, originView[1] + y, originView[2] + z);
       applyCommon(m, i, states, trueScale);
+      if (m.orbitLine) {
+        m.orbitLine.position.set(originView[0], originView[1], originView[2]);
+        if (rescale) writeOrbitLine(m, trueScale);
+      }
     });
     meta.forEach((m, i) => {
       if (m.ref.kind !== 'moon') return;
@@ -173,14 +181,8 @@ export function buildSpaceScene(sim: Sim): SpaceView {
       );
       applyCommon(m, i, states, trueScale);
       if (m.orbitLine) m.orbitLine.position.copy(bodies[p]!.position);
-      if (rescale) writeOrbitLine(m, trueScale, originM);
+      if (rescale) writeOrbitLine(m, trueScale);
     });
-    if (rewriteOrbitLines) {
-      meta.forEach((m) => {
-        if (m.ref.kind !== 'moon') writeOrbitLine(m, trueScale, originM);
-      });
-      lastOriginM = originM;
-    }
     // star lights follow their star
     scene.traverse((o) => {
       const follows = (o as THREE.PointLight & { __followsBody?: number }).__followsBody;
@@ -201,6 +203,6 @@ export function buildSpaceScene(sim: Sim): SpaceView {
     labels,
     update,
     bodyIndexOf: (o) => indexByMesh.get(o) ?? null,
-    hostOriginView: () => compressPosition(...(lastOriginM ?? [0, 0, 0]), lastTrueScale ?? false),
+    hostOriginView: () => [...lastOriginView] as [number, number, number],
   };
 }
