@@ -53,7 +53,7 @@ void main() {
     vec3 transmit = exp(-betaR * sunDepth * 0.35);
     col += sunTints[i] * transmit * (betaR * phaseR(c) + vec3(phaseM(c) * 0.12)) * depth * day;
   }
-  col *= density * 1.6;
+  col *= density * 10.0; // gain visually calibrated: opaque noon sky under a 3800K M-dwarf
   col = vec3(1.0) - exp(-1.4 * col); // tonemap
   float alpha = clamp(max(col.r, max(col.g, col.b)) * 1.7, 0.0, 1.0);
   gl_FragColor = vec4(col, alpha);
