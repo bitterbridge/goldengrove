@@ -25,6 +25,7 @@ export interface HudCallbacks {
   onReroll(): void;
   onShare(): void;
   onDateJump(year: number, dayOfYear: number): void;
+  onToggleView(): void;
 }
 
 export interface Hud {
@@ -32,6 +33,7 @@ export interface Hud {
   setPaused(paused: boolean): void;
   flashShared(): void;
   setActiveSpeed(mult: number): void;
+  setViewButton(label: string, visible: boolean): void;
 }
 
 export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud {
@@ -49,6 +51,11 @@ export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud
   const share = el('button', '', 'share');
   share.addEventListener('click', () => cb.onShare());
   topLeft.append(reroll, trueScale, share);
+  const viewToggle = el('button', '', '');
+  (viewToggle as HTMLButtonElement).name = 'view-toggle';
+  viewToggle.style.display = 'none';
+  viewToggle.addEventListener('click', () => cb.onToggleView());
+  topLeft.append(viewToggle);
 
   const topRight = el('div', 'hud hud-top-right');
   const date = el('span', '', '—');
@@ -96,6 +103,10 @@ export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud
     },
     setActiveSpeed: (mult) => {
       speedButtons.forEach((b, i) => b.classList.toggle('active', SPEED_STEPS[i]!.mult === mult));
+    },
+    setViewButton: (label, visible) => {
+      viewToggle.textContent = label;
+      viewToggle.style.display = visible ? '' : 'none';
     },
   };
   hud.setActiveSpeed(1);

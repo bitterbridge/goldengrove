@@ -19,7 +19,7 @@ describe('formatDate', () => {
 });
 
 describe('buildHud interactions', () => {
-  const noop = { onPlayPause() {}, onSpeed(_: number) {}, onTrueScale(_: boolean) {}, onReroll() {}, onShare() {}, onDateJump(_: number, __: number) {} };
+  const noop = { onPlayPause() {}, onSpeed(_: number) {}, onTrueScale(_: boolean) {}, onReroll() {}, onShare() {}, onDateJump(_: number, __: number) {}, onToggleView() {} };
 
   it('share button fires onShare and flashes', () => {
     const root = document.createElement('div');
@@ -49,5 +49,18 @@ describe('buildHud interactions', () => {
     const active = [...root.querySelectorAll('.hud-bottom button.active')];
     expect(active.length).toBe(1);
     expect(active[0]!.textContent).toBe(SPEED_STEPS.find((s) => s.mult === 86400)!.label);
+  });
+
+  it('view-toggle button is controllable', () => {
+    const root = document.createElement('div');
+    let toggles = 0;
+    const hud = buildHud(root, '42', { ...noop, onToggleView: () => { toggles++; } });
+    const btn = root.querySelector('button[name="view-toggle"]') as HTMLButtonElement;
+    expect(btn.style.display).toBe('none'); // hidden until controller decides
+    hud.setViewButton('⏚ stand here', true);
+    expect(btn.style.display).toBe('');
+    expect(btn.textContent).toBe('⏚ stand here');
+    btn.click();
+    expect(toggles).toBe(1);
   });
 });
