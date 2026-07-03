@@ -23,11 +23,11 @@ fn orbit_paths_have_right_shape() {
     let stars = desc.stars.len();
     let planets = desc.planets.len();
     // stars have no path
-    assert!(orbit_path_points(&desc, 0, 64).is_empty());
+    assert!(orbit_path_points(&desc, 0, 64, 0.0).is_empty());
     // every planet path: 3*segments floats, all points within [peri, apo] of the focus
     for p in 0..planets {
         let body = stars + p;
-        let path = orbit_path_points(&desc, body, 64);
+        let path = orbit_path_points(&desc, body, 64, 0.0);
         assert_eq!(path.len(), 3 * 64);
         let orbit = &desc.planets[p].orbit;
         let (a, e) = (orbit.semi_major_axis_m, orbit.eccentricity);
@@ -40,7 +40,7 @@ fn orbit_paths_have_right_shape() {
     if let Some((pi, _)) = desc.planets.iter().enumerate().find(|(_, p)| !p.moons.is_empty()) {
         let moons_before: usize = desc.planets[..pi].iter().map(|p| p.moons.len()).sum();
         let body = stars + planets + moons_before;
-        let path = orbit_path_points(&desc, body, 32);
+        let path = orbit_path_points(&desc, body, 32, 0.0);
         assert_eq!(path.len(), 3 * 32);
     }
 }
@@ -97,7 +97,7 @@ fn orbit_path_origins_and_indexing_agree_with_ephemeris_at_epoch() {
             PlanetHost::Primary => states[0].position_m,
         };
         for (pi, _) in d.planets.iter().enumerate() {
-            let path = orbit_path_points(d, stars + pi, 8);
+            let path = orbit_path_points(d, stars + pi, 8, 0.0);
             let expect = states[stars + pi].position_m;
             for k in 0..3 {
                 let got = origin[k] + path[k];
@@ -145,4 +145,26 @@ fn host_origin_matches_ephemeris_convention() {
         }
     }
     assert!(saw_barycenter);
+}
+
+#[test]
+fn orbit_paths_follow_secular_drift() {
+    // A planet with a large apsidal rate: the path sampled at a later t must
+    // rotate its periapsis accordingly (epoch-frozen paths were the old bug).
+    let mut desc = gg_gen::generate(42);
+    desc.planets[0].orbit.eccentricity = 0.4;
+    desc.planets[0].secular.apsidal_rad_per_s = 1.0e-9;
+    let stars = desc.stars.len();
+    let p0 = orbit_path_points(&desc, stars, 64, 0.0);
+    let big_t = 1.0e9; // periapsis advanced by 1 radian
+    let p1 = orbit_path_points(&desc, stars, 64, big_t);
+    // same shape (same point count), rotated: first sample differs by ~a*e-scale distance
+    assert_eq!(p0.len(), p1.len());
+    let dx = p1[0] - p0[0];
+    let dy = p1[1] - p0[1];
+    let a = desc.planets[0].orbit.semi_major_axis_m;
+    assert!(
+        (dx * dx + dy * dy).sqrt() > 0.05 * a,
+        "path did not move under 1 rad of apsidal drift"
+    );
 }

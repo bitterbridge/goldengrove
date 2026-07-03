@@ -7,7 +7,7 @@ export interface Sim {
   descriptor: SystemDescriptor;
   bodyCount: number;
   statesAt(tS: number): Float64Array;
-  orbitPath(bodyIndex: number, segments: number): Float64Array;
+  orbitPath(bodyIndex: number, segments: number, tS: number): Float64Array;
   anchorDate(tS: number): DateTime;
   hostOriginAt(tS: number): Float64Array;
 }
@@ -32,7 +32,7 @@ export async function loadSim(seed: string): Promise<Sim> {
     descriptor,
     bodyCount: world.body_count(),
     statesAt: (tS) => world.states_at(tS),
-    orbitPath: (i, segments) => world.orbit_path(i, segments),
+    orbitPath: (i, segments, tS) => world.orbit_path(i, segments, tS),
     anchorDate: (tS) => JSON.parse(world.anchor_date_json(tS)) as DateTime,
     hostOriginAt: (tS) => world.host_origin_at(tS),
   };

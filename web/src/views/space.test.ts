@@ -29,7 +29,7 @@ function fakeSim(): Sim {
       }
       return out;
     },
-    orbitPath: (i, segments) => {
+    orbitPath: (i, segments, _tS) => {
       if (i < golden.stars.length) return new Float64Array(0);
       const out = new Float64Array(segments * 3);
       for (let k = 0; k < segments; k++) {
@@ -89,7 +89,7 @@ function fakeSimWithDisplacedStars(): Sim {
       out[1 * 7 + 2] = STAR_OFFSET[2];
       return out;
     },
-    orbitPath: (i, segments) => {
+    orbitPath: (i, segments, _tS) => {
       if (i < golden.stars.length) return new Float64Array(0);
       const out = new Float64Array(segments * 3);
       for (let k = 0; k < segments; k++) {
@@ -130,7 +130,7 @@ describe('buildSpaceScene', () => {
   it('update() positions meshes and never leaves NaNs', () => {
     const sim = fakeSim();
     const view = buildSpaceScene(sim);
-    view.update(sim.statesAt(0), false, sim.hostOriginAt(0));
+    view.update(sim.statesAt(0), false, sim.hostOriginAt(0), 0);
     for (const mesh of view.bodies) {
       expect(Number.isFinite(mesh.position.x)).toBe(true);
       expect(mesh.position.length()).toBeGreaterThan(0);
@@ -149,7 +149,7 @@ describe('buildSpaceScene', () => {
     const view = buildSpaceScene(sim);
     const states = sim.statesAt(0);
     const originM = sim.hostOriginAt(0);
-    view.update(states, false, originM);
+    view.update(states, false, originM, 0);
 
     const lines = view.scene.getObjectByName('orbit-lines')!;
     const firstLine = lines.children[0] as THREE.LineLoop;
@@ -158,11 +158,11 @@ describe('buildSpaceScene', () => {
     expect(Number.isFinite(compressedX)).toBe(true);
     expect(compressedX).not.toBe(0); // first frame wrote vertices
 
-    view.update(states, true, originM); // flip to true scale
+    view.update(states, true, originM, 0); // flip to true scale
     const trueX = attr.getX(1);
     expect(trueX).not.toBeCloseTo(compressedX, 6); // vertices rewritten
 
-    view.update(states, false, originM); // flip back
+    view.update(states, false, originM, 0); // flip back
     expect(attr.getX(1)).toBeCloseTo(compressedX, 6);
 
     // star point-light follows its star mesh
@@ -191,9 +191,9 @@ describe('buildSpaceScene', () => {
       const moonOrbitLine = lines.children.find((c) => c.name === `orbit-${moonIdx2}`)! as THREE.LineLoop;
       const mAttr = (moonOrbitLine.geometry as THREE.BufferGeometry).getAttribute('position');
       const compressedMX = mAttr.getX(1);
-      view.update(states, true, originM);
+      view.update(states, true, originM, 0);
       expect(mAttr.getX(1)).not.toBeCloseTo(compressedMX, 6);
-      view.update(states, false, originM);
+      view.update(states, false, originM, 0);
       expect(mAttr.getX(1)).toBeCloseTo(compressedMX, 6);
     }
   });
@@ -203,7 +203,7 @@ describe('buildSpaceScene', () => {
     const view = buildSpaceScene(sim);
     const states = sim.statesAt(0);
     const originMArr = sim.hostOriginAt(0);
-    view.update(states, false, originMArr);
+    view.update(states, false, originMArr, 0);
 
     // mass-weighted barycenter of the close pair (stars 0 and 1) — same
     // formula the fix uses to compute the planet host origin.
@@ -259,12 +259,25 @@ describe('buildSpaceScene', () => {
 
     // flip trueScale: vertices rewrite with true-scale compression and the
     // line follows the true-scale originView
-    view.update(states, true, originMArr);
+    view.update(states, true, originMArr, 0);
     const originViewTrue = compressPosition(originM[0], originM[1], originM[2], true);
     expect(firstLine.position.x).toBeCloseTo(originViewTrue[0], 4);
     expected = compressPosition(raw[0]!, raw[1]!, raw[2]!, true);
     expect(attr.getX(0)).toBeCloseTo(expected[0], 4);
     expect(attr.getY(0)).toBeCloseTo(expected[1], 4);
     expect(attr.getZ(0)).toBeCloseTo(expected[2], 4);
+  });
+
+  it('refreshes orbit paths when the sim time moves far from the path epoch', () => {
+    const sim = fakeSim();
+    let calls = 0;
+    const orig = sim.orbitPath;
+    sim.orbitPath = (i, seg, tS) => { calls++; return orig(i, seg, tS); };
+    const view = buildSpaceScene(sim);
+    const built = calls;
+    view.update(sim.statesAt(0), false, sim.hostOriginAt(0), 0);
+    expect(calls).toBe(built); // fresh: no refetch
+    view.update(sim.statesAt(0), false, sim.hostOriginAt(0), 1e9); // ~30 years
+    expect(calls).toBeGreaterThan(built); // stale: refetched
   });
 });

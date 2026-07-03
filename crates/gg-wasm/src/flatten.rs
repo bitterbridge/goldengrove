@@ -30,22 +30,23 @@ pub fn planet_host_mass(desc: &SystemDescriptor) -> f64 {
 }
 
 /// One full orbit for a planet or moon, sampled at `segments` equal time
-/// steps, positions RELATIVE to the parent focus (epoch elements — secular
-/// drift over one orbit is invisible at render scale). Stars: empty.
-pub fn orbit_path_points(desc: &SystemDescriptor, body_index: usize, segments: usize) -> Vec<f64> {
+/// steps, positions RELATIVE to the parent focus, from elements with secular
+/// drift applied at `t_s` (so the path's periapsis matches the body's actual
+/// position at that time — see gg_ephemeris::elements_at). Stars: empty.
+pub fn orbit_path_points(desc: &SystemDescriptor, body_index: usize, segments: usize, t_s: f64) -> Vec<f64> {
     let stars = desc.stars.len();
     let planets = desc.planets.len();
-    let (elements, mu) = if body_index < stars {
+    let (elements, secular, mu) = if body_index < stars {
         return Vec::new();
     } else if body_index < stars + planets {
         let p = &desc.planets[body_index - stars];
-        (p.orbit, G * planet_host_mass(desc))
+        (p.orbit, p.secular, G * planet_host_mass(desc))
     } else {
         let mut m = body_index - stars - planets;
         let mut found = None;
         for p in &desc.planets {
             if m < p.moons.len() {
-                found = Some((p.moons[m].orbit, G * p.mass_kg));
+                found = Some((p.moons[m].orbit, p.moons[m].secular, G * p.mass_kg));
                 break;
             }
             m -= p.moons.len();
@@ -55,6 +56,7 @@ pub fn orbit_path_points(desc: &SystemDescriptor, body_index: usize, segments: u
             None => return Vec::new(), // out-of-range index: empty, not panic
         }
     };
+    let elements = gg_ephemeris::elements_at(&elements, &secular, t_s);
     let period = orbital_period_s(elements.semi_major_axis_m, mu);
     let mut out = Vec::with_capacity(3 * segments);
     for k in 0..segments {

@@ -23,8 +23,8 @@ impl World {
         Ok(World { eph: KeplerSecular::new(gg_gen::generate(seed)) })
     }
 
-    pub fn descriptor_json(&self) -> String {
-        serde_json::to_string(self.eph.desc()).expect("descriptor always serializes")
+    pub fn descriptor_json(&self) -> Result<String, JsError> {
+        serde_json::to_string(self.eph.desc()).map_err(|e| JsError::new(&format!("descriptor serialization failed: {e}")))
     }
 
     pub fn body_count(&self) -> usize {
@@ -36,9 +36,10 @@ impl World {
         js_sys::Float64Array::from(flatten_states(&self.eph, t_s).as_slice())
     }
 
-    /// 3 f64 per segment, relative to the parent focus. Empty for stars.
-    pub fn orbit_path(&self, body_index: usize, segments: usize) -> js_sys::Float64Array {
-        js_sys::Float64Array::from(orbit_path_points(self.eph.desc(), body_index, segments).as_slice())
+    /// 3 f64 per segment, relative to the parent focus, sampled from the
+    /// secular-drifted elements at time t. Empty for stars.
+    pub fn orbit_path(&self, body_index: usize, segments: usize, t_s: f64) -> js_sys::Float64Array {
+        js_sys::Float64Array::from(orbit_path_points(self.eph.desc(), body_index, segments, t_s).as_slice())
     }
 
     /// [x, y, z] of the point planets orbit, meters.
@@ -47,12 +48,13 @@ impl World {
     }
 
     /// Anchor planet's calendar date at t.
-    pub fn anchor_date_json(&self, t_s: f64) -> String {
+    pub fn anchor_date_json(&self, t_s: f64) -> Result<String, JsError> {
         let desc = self.eph.desc();
         let cal = desc.planets[desc.anchor_planet]
             .calendar
             .as_ref()
-            .expect("anchor planet always has a calendar");
-        serde_json::to_string(&gg_gen::calendar::date_at(cal, t_s)).expect("date serializes")
+            .ok_or_else(|| JsError::new("anchor planet has no calendar"))?;
+        serde_json::to_string(&gg_gen::calendar::date_at(cal, t_s))
+            .map_err(|e| JsError::new(&format!("date serialization failed: {e}")))
     }
 }

@@ -6,12 +6,13 @@ import { compressPosition, displayRadius, moonViewFactor } from './compression';
 import { temperatureToColor } from './color';
 
 const ORBIT_SEGMENTS = 128;
+const PATH_REFRESH_S = 3.156e8; // ~10 Earth years: far below secular timescales, cheap to refresh
 
 export interface SpaceView {
   scene: THREE.Scene;
   bodies: THREE.Mesh[];
   labels: CSS2DObject[];
-  update(states: Float64Array, trueScale: boolean, originM: Float64Array): void;
+  update(states: Float64Array, trueScale: boolean, originM: Float64Array, tS: number): void;
   bodyIndexOf(object: THREE.Object3D): number | null;
   hostOriginView(): [number, number, number];
 }
@@ -74,7 +75,7 @@ export function buildSpaceScene(sim: Sim): SpaceView {
       orbitLine: null,
     };
 
-    const path = sim.orbitPath(i, ORBIT_SEGMENTS);
+    const path = sim.orbitPath(i, ORBIT_SEGMENTS, 0);
     if (path.length > 0) {
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(path.length), 3));
@@ -84,6 +85,8 @@ export function buildSpaceScene(sim: Sim): SpaceView {
       );
       line.name = `orbit-${i}`;
       line.userData.rawPath = path;
+      line.userData.pathEpoch = 0;
+      line.userData.bodyIndex = i;
       orbitGroup.add(line);
       m.orbitLine = line;
     }
@@ -113,7 +116,16 @@ export function buildSpaceScene(sim: Sim): SpaceView {
   let lastTrueScale: boolean | null = null;
   let lastOriginView: [number, number, number] = [0, 0, 0];
 
-  function update(states: Float64Array, trueScale: boolean, originM: Float64Array): void {
+  function update(states: Float64Array, trueScale: boolean, originM: Float64Array, tS: number): void {
+    meta.forEach((m) => {
+      const line = m.orbitLine;
+      if (!line) return;
+      if (Math.abs(tS - (line.userData.pathEpoch as number)) > PATH_REFRESH_S) {
+        line.userData.rawPath = sim.orbitPath(line.userData.bodyIndex as number, ORBIT_SEGMENTS, tS);
+        line.userData.pathEpoch = tS;
+        writeOrbitLine(m, lastTrueScale ?? false);
+      }
+    });
     const rescale = trueScale !== lastTrueScale;
     lastTrueScale = trueScale;
     // Host-origin-centric compression: compress each body's OFFSET from the

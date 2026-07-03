@@ -70,7 +70,7 @@ async function boot(): Promise<void> {
 
   // Prime the view once so the host origin is known, then frame the camera
   // on it (trinary systems can have the planet host far from world origin).
-  view.update(sim.statesAt(0), trueScale, sim.hostOriginAt(0));
+  view.update(sim.statesAt(0), trueScale, sim.hostOriginAt(0), 0);
   const [ox, oy, oz] = view.hostOriginView();
   controls.target.set(ox, oy, oz);
   camera.position.set(ox, oy - 28, oz + 16);
@@ -131,7 +131,7 @@ async function boot(): Promise<void> {
     lastWall = now;
     clock.tick(dt);
 
-    view.update(sim.statesAt(clock.t), trueScale, sim.hostOriginAt(clock.t));
+    view.update(sim.statesAt(clock.t), trueScale, sim.hostOriginAt(clock.t), clock.t);
     if (focused !== null) {
       controls.target.lerp(view.bodies[focused]!.position, 0.15);
     }

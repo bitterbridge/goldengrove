@@ -35,12 +35,12 @@ fn world_boundary_marshals_correctly() {
     let axis_len = (v[3] * v[3] + v[4] * v[4] + v[5] * v[5]).sqrt();
     assert!((axis_len - 1.0).abs() < 1e-9, "spin axis not normalized: {axis_len}");
     // orbit path: stars empty, first planet non-empty
-    assert_eq!(w.orbit_path(0, 64).length(), 0);
-    let desc: serde_json::Value = serde_json::from_str(&w.descriptor_json()).unwrap();
+    assert_eq!(w.orbit_path(0, 64, 0.0).length(), 0);
+    let desc: serde_json::Value = serde_json::from_str(&w.descriptor_json().unwrap()).unwrap();
     let n_stars = desc["stars"].as_array().unwrap().len();
-    assert_eq!(w.orbit_path(n_stars, 64).length(), 3 * 64);
+    assert_eq!(w.orbit_path(n_stars, 64, 0.0).length(), 3 * 64);
     // anchor date parses and starts at year 0
-    let date: serde_json::Value = serde_json::from_str(&w.anchor_date_json(0.0)).unwrap();
+    let date: serde_json::Value = serde_json::from_str(&w.anchor_date_json(0.0).unwrap()).unwrap();
     assert_eq!(date["year"].as_u64().unwrap(), 0);
     let origin = w.host_origin_at(1.0e7);
     assert_eq!(origin.length(), 3);
