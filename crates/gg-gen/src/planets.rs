@@ -23,6 +23,7 @@ pub fn habitable_zone_m(total_luminosity_w: f64) -> (f64, f64) {
     ((l / 1.1).sqrt() * AU, (l / 0.53).sqrt() * AU)
 }
 
+/// Solar-nebula snow line ~2.7 AU (Hayashi 1981), scaled by sqrt(L).
 pub fn frost_line_m(total_luminosity_w: f64) -> f64 {
     2.7 * AU * (total_luminosity_w / L_SUN).sqrt()
 }
@@ -174,30 +175,77 @@ pub fn generate_planets(rng: &mut RngStream, ctx: &StellarContext) -> (Vec<Plane
     planets.push(anchor);
     planets.extend(outward);
 
-    enforce_hill_spacing(&mut planets, ctx.total_mass_kg, anchor_index);
+    let anchor_index = enforce_hill_spacing(&mut planets, ctx.total_mass_kg, anchor_index);
+
+    // Spacing enforcement can change semi_major_axis_m after sample_planet
+    // already computed the GR apsidal rate for the pre-spacing orbit — recompute
+    // so secular.apsidal_rad_per_s matches the final orbit for every planet.
+    for p in &mut planets {
+        p.secular.apsidal_rad_per_s = gr_apsidal_rate(ctx.host_mass_kg, &p.orbit);
+    }
+
     (planets, anchor_index)
 }
 
-/// Push planets outward until every adjacent pair is >= 8 mutual Hill radii
+/// Push planets apart until every adjacent pair is >= 8 mutual Hill radii
 /// apart. The anchor never moves (it must stay in the HZ); neighbors move
 /// away from it.
-fn enforce_hill_spacing(planets: &mut [Planet], m_star: f64, anchor: usize) {
-    let spaced = |p1: &Planet, p2: &Planet| {
-        let a1 = p1.orbit.semi_major_axis_m;
-        let a2 = p2.orbit.semi_major_axis_m;
-        let rh = ((p1.mass_kg + p2.mass_kg) / (3.0 * m_star)).cbrt() * (a1 + a2) / 2.0;
-        (a2 - a1) / rh >= 8.0
-    };
-    // outward from anchor: move outer neighbor further out
-    for i in anchor..planets.len().saturating_sub(1) {
-        while !spaced(&planets[i], &planets[i + 1]) {
-            planets[i + 1].orbit.semi_major_axis_m *= 1.1;
+///
+/// Closed-form derivation (replaces the old iterative *=1.1 / /=1.1 loops,
+/// which could spin forever): requiring (a2 - a1) >= 8 * rh with
+/// rh = k*(a1+a2)/2 and k = ((m1+m2)/(3*m_star)).cbrt() rearranges to
+/// a2 >= a1 * (1 + 4k) / (1 - 4k), valid only while 4k < 1. As k approaches
+/// 0.25 this bound diverges — for k >= 0.25 no finite separation satisfies
+/// the >= 8 mutual-Hill criterion at all, so the old loop would run forever.
+/// We treat 4k >= 0.95 (k close enough to the asymptote to be practically
+/// unsatisfiable) as a sign the pair could not have coexisted at any
+/// separation and drop the non-anchor member of the pair instead of looping.
+///
+/// Returns the (possibly shifted) anchor index; the anchor planet itself is
+/// never moved or removed.
+fn enforce_hill_spacing(planets: &mut Vec<Planet>, m_star: f64, anchor: usize) -> usize {
+    let mut anchor = anchor;
+
+    // Outward pass: walk from the anchor to the edge, pushing each outer
+    // neighbor far enough out (or dropping it if no separation would do).
+    let mut i = anchor;
+    while i + 1 < planets.len() {
+        let a1 = planets[i].orbit.semi_major_axis_m;
+        let k = ((planets[i].mass_kg + planets[i + 1].mass_kg) / (3.0 * m_star)).cbrt();
+        if 4.0 * k >= 0.95 {
+            planets.remove(i + 1);
+            // anchor index unaffected (removal is strictly after it); recheck
+            // the same i against its new neighbor.
+            continue;
         }
-    }
-    // inward from anchor: move inner neighbor further in
-    for i in (1..=anchor).rev() {
-        while !spaced(&planets[i - 1], &planets[i]) {
-            planets[i - 1].orbit.semi_major_axis_m /= 1.1;
+        // Tiny (1e-9) safety margin so that recomputing the ratio from the
+        // stored f64 semi-major axis doesn't round back under 8.0.
+        let min_a2 = a1 * (1.0 + 4.0 * k) / (1.0 - 4.0 * k) * (1.0 + 1e-9);
+        if planets[i + 1].orbit.semi_major_axis_m < min_a2 {
+            planets[i + 1].orbit.semi_major_axis_m = min_a2;
         }
+        i += 1;
     }
+
+    // Inward pass: walk from the anchor to the edge, pulling each inner
+    // neighbor far enough in (or dropping it if no separation would do).
+    let mut i = anchor;
+    while i > 0 {
+        let a2 = planets[i].orbit.semi_major_axis_m;
+        let k = ((planets[i - 1].mass_kg + planets[i].mass_kg) / (3.0 * m_star)).cbrt();
+        if 4.0 * k >= 0.95 {
+            planets.remove(i - 1);
+            anchor -= 1;
+            i -= 1;
+            continue;
+        }
+        // Same safety margin, mirrored for the inward bound.
+        let max_a1 = a2 * (1.0 - 4.0 * k) / (1.0 + 4.0 * k) * (1.0 - 1e-9);
+        if planets[i - 1].orbit.semi_major_axis_m > max_a1 {
+            planets[i - 1].orbit.semi_major_axis_m = max_a1;
+        }
+        i -= 1;
+    }
+
+    anchor
 }

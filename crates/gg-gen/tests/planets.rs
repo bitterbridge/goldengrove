@@ -76,6 +76,70 @@ fn orbits_sorted_spaced_and_classified() {
             }
             assert!(p.mass_kg > 0.0 && p.radius_m > 0.0);
             assert!(p.rotation_period_s > 4.0 * 3600.0);
+            // Regression floor: inward Hill-spacing pushes must not shove a
+            // planet absurdly far below the innermost stable orbit.
+            assert!(
+                p.orbit.semi_major_axis_m >= ctx.min_planet_a_m * 0.75,
+                "seed {seed}: planet at {} AU below min_planet_a_m floor",
+                p.orbit.semi_major_axis_m / AU
+            );
+        }
+    }
+}
+
+#[test]
+fn low_mass_hosts_terminate_and_stay_spaced() {
+    let ctx = StellarContext {
+        host_mass_kg: 0.1 * M_SUN,
+        total_mass_kg: 0.1 * M_SUN,
+        total_luminosity_w: 0.23 * 0.1_f64.powf(2.3) * L_SUN,
+        min_planet_a_m: 0.01 * AU,
+        age_s: 4.5e9 * 3.156e7,
+        primary_ms_lifetime_s: 10e9 * 3.156e7,
+    };
+    let (hz_inner, hz_outer) = habitable_zone_m(ctx.total_luminosity_w);
+    for seed in 0..100u64 {
+        let mut rng = RngStream::root(seed).child("planets");
+        // Regression: this used to hang forever for low-mass hosts.
+        let (planets, anchor) = generate_planets(&mut rng, &ctx);
+        assert!(!planets.is_empty(), "seed {seed}");
+
+        for w in planets.windows(2) {
+            let (p1, p2) = (&w[0], &w[1]);
+            let a1 = p1.orbit.semi_major_axis_m;
+            let a2 = p2.orbit.semi_major_axis_m;
+            assert!(a2 > a1, "seed {seed}: not sorted");
+            let rh = (((p1.mass_kg + p2.mass_kg) / (3.0 * ctx.total_mass_kg)).cbrt())
+                * (a1 + a2)
+                / 2.0;
+            assert!((a2 - a1) / rh >= 7.99, "seed {seed}: spacing {}", (a2 - a1) / rh);
+        }
+
+        let a_planet = &planets[anchor];
+        assert_eq!(a_planet.class, PlanetClass::Rocky, "seed {seed}");
+        let a = a_planet.orbit.semi_major_axis_m;
+        assert!(
+            a >= 0.9 * hz_inner && a <= 1.1 * hz_outer,
+            "seed {seed}: anchor at {} AU",
+            a / AU
+        );
+    }
+}
+
+#[test]
+fn secular_rates_match_final_orbits() {
+    let ctx = sunlike_ctx();
+    for seed in 0..200u64 {
+        let mut rng = RngStream::root(seed).child("planets");
+        let (planets, _) = generate_planets(&mut rng, &ctx);
+        for p in &planets {
+            let expected = gr_apsidal_rate(ctx.host_mass_kg, &p.orbit);
+            let tol = 1e-6 * expected.abs().max(1e-30);
+            assert!(
+                (p.secular.apsidal_rad_per_s - expected).abs() <= tol,
+                "seed {seed}: secular rate {} does not match final orbit rate {expected}",
+                p.secular.apsidal_rad_per_s
+            );
         }
     }
 }
