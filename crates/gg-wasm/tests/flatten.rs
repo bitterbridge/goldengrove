@@ -54,11 +54,26 @@ fn seed_string_worlds_are_deterministic() {
 }
 
 #[test]
-fn orbit_paths_agree_with_ephemeris_at_t_zero() {
-    // The path's first sample is position_at(elements, mu, 0). If our
-    // host-mass mirror drifted from gg-ephemeris's convention, mu — and any
-    // secular-free position derived from it — would disagree with the
-    // ephemeris ground truth. Compare planet world-positions at t=0.
+fn host_mass_mirror_matches_ephemeris_exactly() {
+    use gg_gen::descriptor::PlanetHost;
+    let mut saw_barycenter = false;
+    let mut saw_primary = false;
+    for seed in 0..200u64 {
+        let desc = gg_gen::generate(seed);
+        match desc.planet_host {
+            PlanetHost::Barycenter => saw_barycenter = true,
+            PlanetHost::Primary => saw_primary = true,
+        }
+        let mirror = gg_wasm::flatten::planet_host_mass(&desc);
+        let eph = KeplerSecular::new(desc);
+        assert_eq!(mirror, eph.host_mass(), "seed {seed}: host-mass conventions diverged");
+    }
+    assert!(saw_barycenter && saw_primary, "seed range must cover both host variants");
+}
+
+#[test]
+fn orbit_path_origins_and_indexing_agree_with_ephemeris_at_epoch() {
+    // At t=0 positions are mu-independent; this pins the host-ORIGIN aggregation (pair barycenter vs primary) and body indexing, not the host mass — see host_mass_mirror_matches_ephemeris_exactly for that.
     use gg_gen::descriptor::PlanetHost;
     let mut checked_barycenter = false;
     for seed in 0..80u64 {

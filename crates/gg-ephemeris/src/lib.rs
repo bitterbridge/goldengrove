@@ -107,7 +107,8 @@ impl KeplerSecular {
         pos
     }
 
-    fn host_mass(&self) -> f64 {
+    /// Mass the planets orbit: the close pair for Barycenter hosts, the primary alone otherwise. Public so boundary crates can pin their mirrored convention against it.
+    pub fn host_mass(&self) -> f64 {
         match self.desc.planet_host {
             // Circumbinary planets orbit the close pair only (stars[0] and
             // [1]); generate_stars guarantees the close companion is always

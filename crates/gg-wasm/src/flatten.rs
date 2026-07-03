@@ -22,7 +22,7 @@ pub fn flatten_states(eph: &KeplerSecular, t_s: f64) -> Vec<f64> {
 
 /// Mass planets orbit (mirrors gg-ephemeris's private helper: close pair
 /// for Barycenter, primary alone otherwise).
-fn planet_host_mass(desc: &SystemDescriptor) -> f64 {
+pub fn planet_host_mass(desc: &SystemDescriptor) -> f64 {
     match desc.planet_host {
         PlanetHost::Barycenter => desc.stars[0].mass_kg + desc.stars[1].mass_kg,
         PlanetHost::Primary => desc.stars[0].mass_kg,
