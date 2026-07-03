@@ -5,7 +5,9 @@ import { loadSim, WasmLoadError, type Sim } from './sim/wasm';
 import { SimClock } from './time/clock';
 import { buildSpaceScene, type SpaceView } from './views/space';
 import { buildHud, formatDate } from './ui/hud';
-import { parseSeedFromHash, randomSeed } from './ui/seed';
+import { randomSeed } from './ui/seed';
+import { defaultAppState, parseAppState, serializeAppState, type AppState } from './state/url';
+import { timeAtDate } from './sim/calendar';
 import './styles.css';
 
 const app = document.getElementById('app')!;
@@ -15,8 +17,9 @@ const app = document.getElementById('app')!;
 addEventListener('hashchange', () => location.reload());
 
 async function boot(): Promise<void> {
-  const seed = parseSeedFromHash(location.hash) ?? randomSeed();
-  location.hash = `seed=${seed}`;
+  const state: AppState = parseAppState(location.hash) ?? defaultAppState(randomSeed());
+  history.replaceState(null, '', serializeAppState(state)); // canonicalize without firing hashchange
+  const seed = state.seed;
   app.replaceChildren();
 
   let sim: Sim;
@@ -55,8 +58,11 @@ async function boot(): Promise<void> {
 
   const view: SpaceView = buildSpaceScene(sim);
   const clock = new SimClock();
+  clock.t = state.t;
+  clock.speed = state.speed;
   let trueScale = false;
   let focused: number | null = null;
+  if (state.body !== null && state.body < sim.bodyCount) focused = state.body;
 
   // Prime the view once so the host origin is known, then frame the camera
   // on it (trinary systems can have the planet host far from world origin).
@@ -71,7 +77,18 @@ async function boot(): Promise<void> {
     onSpeed: (m) => { clock.speed = m; },
     onTrueScale: (on) => { trueScale = on; },
     onReroll: () => { location.hash = `seed=${randomSeed()}`; },
+    onShare: () => {
+      const now: AppState = { ...state, t: clock.t, speed: clock.speed, body: focused };
+      const hash = serializeAppState(now);
+      history.replaceState(null, '', hash);
+      void navigator.clipboard.writeText(`${location.origin}${location.pathname}${hash}`);
+      hud.flashShared();
+    },
+    onDateJump: (year, day) => {
+      clock.t = timeAtDate(anchorCal, year, day);
+    },
   });
+  hud.setActiveSpeed(clock.speed);
 
   function resize(): void {
     const { clientWidth: w, clientHeight: h } = app;

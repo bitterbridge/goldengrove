@@ -8,6 +8,7 @@ canvas { display: block; }
 .hud button { background: #1a2340; color: #cfd8e3; border: 1px solid #2a3350;
   border-radius: 5px; padding: 0.15rem 0.55rem; font: inherit; cursor: pointer; }
 .hud button.active { background: #3350a0; }
+.hud input { background: #10182e; color: inherit; border: 1px solid #2a3350; border-radius: 5px; padding: 0.15rem 0.35rem; font: inherit; }
 .hud-top-left { top: 12px; left: 12px; }
 .hud-top-right { top: 12px; right: 12px; }
 .hud-bottom { bottom: 12px; left: 50%; transform: translateX(-50%); }

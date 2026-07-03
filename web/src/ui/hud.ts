@@ -23,11 +23,15 @@ export interface HudCallbacks {
   onSpeed(mult: number): void;
   onTrueScale(on: boolean): void;
   onReroll(): void;
+  onShare(): void;
+  onDateJump(year: number, dayOfYear: number): void;
 }
 
 export interface Hud {
   setDate(s: string): void;
   setPaused(paused: boolean): void;
+  flashShared(): void;
+  setActiveSpeed(mult: number): void;
 }
 
 export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud {
@@ -42,11 +46,29 @@ export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud
     trueScale.classList.toggle('active', ts);
     cb.onTrueScale(ts);
   });
-  topLeft.append(reroll, trueScale);
+  const share = el('button', '', 'share');
+  share.addEventListener('click', () => cb.onShare());
+  topLeft.append(reroll, trueScale, share);
 
   const topRight = el('div', 'hud hud-top-right');
   const date = el('span', '', '—');
   topRight.append(date);
+  const jumpYear = document.createElement('input');
+  jumpYear.name = 'jump-year';
+  jumpYear.placeholder = 'Y';
+  jumpYear.style.width = '4.5em';
+  const jumpDay = document.createElement('input');
+  jumpDay.name = 'jump-day';
+  jumpDay.placeholder = 'day';
+  jumpDay.style.width = '3.5em';
+  const jumpGo = el('button', '', 'jump');
+  (jumpGo as HTMLButtonElement).name = 'jump-go';
+  jumpGo.addEventListener('click', () => {
+    const y = Math.max(1, Math.floor(Number(jumpYear.value)));
+    const d = Math.max(1, Math.floor(Number(jumpDay.value) || 1));
+    if (Number.isFinite(y)) cb.onDateJump(y - 1, d - 1);
+  });
+  topRight.append(jumpYear, jumpDay, jumpGo);
 
   const bottom = el('div', 'hud hud-bottom');
   const play = el('button', '', '⏸');
@@ -55,7 +77,6 @@ export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud
   const speedButtons: HTMLButtonElement[] = [];
   for (const s of SPEED_STEPS) {
     const b = el('button', '', s.label);
-    if (s.mult === 1) b.classList.add('active');
     b.addEventListener('click', () => {
       speedButtons.forEach((x) => x.classList.remove('active'));
       b.classList.add('active');
@@ -66,10 +87,19 @@ export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud
   }
 
   root.append(topLeft, topRight, bottom);
-  return {
+  const hud: Hud = {
     setDate: (s) => { date.textContent = s; },
     setPaused: (p) => { play.textContent = p ? '▶' : '⏸'; },
+    flashShared: () => {
+      share.textContent = 'copied ✓';
+      setTimeout(() => { share.textContent = 'share'; }, 1500);
+    },
+    setActiveSpeed: (mult) => {
+      speedButtons.forEach((b, i) => b.classList.toggle('active', SPEED_STEPS[i]!.mult === mult));
+    },
   };
+  hud.setActiveSpeed(1);
+  return hud;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string): HTMLElementTagNameMap[K] {
