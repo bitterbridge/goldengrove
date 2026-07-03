@@ -97,7 +97,11 @@ impl KeplerSecular {
 
     fn host_mass(&self) -> f64 {
         match self.desc.planet_host {
-            PlanetHost::Barycenter => self.desc.stars.iter().map(|s| s.mass_kg).sum(),
+            // Circumbinary planets orbit the close pair only (stars[0] and
+            // [1]); generate_stars guarantees the close companion is always
+            // index 1 when the host is Barycenter. A wide tertiary's mass
+            // must not inflate the host mass planets actually orbit.
+            PlanetHost::Barycenter => self.desc.stars[0].mass_kg + self.desc.stars[1].mass_kg,
             PlanetHost::Primary => self.desc.stars[0].mass_kg,
         }
     }
@@ -124,7 +128,21 @@ impl Ephemeris for KeplerSecular {
         }
 
         let host_origin = match self.desc.planet_host {
-            PlanetHost::Barycenter => [0.0; 3],
+            // A wide tertiary companion's recoil displaces the close pair
+            // far from the system origin (total-mass barycenter). Planets
+            // ride the pair, not the origin, so their host is the close
+            // pair's own mass-weighted barycenter at time t — not [0,0,0].
+            PlanetHost::Barycenter => {
+                let m0 = self.desc.stars[0].mass_kg;
+                let m1 = self.desc.stars[1].mass_kg;
+                let p0 = star_pos[0];
+                let p1 = star_pos[1];
+                [
+                    (m0 * p0[0] + m1 * p1[0]) / (m0 + m1),
+                    (m0 * p0[1] + m1 * p1[1]) / (m0 + m1),
+                    (m0 * p0[2] + m1 * p1[2]) / (m0 + m1),
+                ]
+            }
             PlanetHost::Primary => star_pos[0],
         };
         let mu_host = G * self.host_mass();

@@ -28,7 +28,11 @@ pub fn generate(seed: u64) -> SystemDescriptor {
         PlanetHost::Primary => 0.06 * AU,
     };
     let host_mass = match stars_out.planet_host {
-        PlanetHost::Barycenter => total_mass,
+        // Circumbinary planets orbit the close pair only (stars[0] + [1]);
+        // generate_stars guarantees the close companion is always index 1
+        // when the host is Barycenter. A wide tertiary contributes to
+        // total_mass_kg (Hill radii) but not to the planets' host mass.
+        PlanetHost::Barycenter => stars_out.stars[0].mass_kg + stars_out.stars[1].mass_kg,
         PlanetHost::Primary => stars_out.stars[0].mass_kg,
     };
     let ctx = StellarContext {

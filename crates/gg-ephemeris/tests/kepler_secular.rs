@@ -122,6 +122,57 @@ fn binary_barycenter_stays_at_origin() {
 }
 
 #[test]
+fn trinary_planets_ride_the_close_pair() {
+    // Close pair (sun + companion at 0.1 AU) plus a wide tertiary at 100 AU.
+    // The wide companion's recoil displaces the close pair far from the
+    // system origin; planets must ride the pair's barycenter, not [0,0,0].
+    let mut desc = single_planet_system();
+    desc.planet_host = PlanetHost::Barycenter;
+
+    let mut close_companion = sun();
+    close_companion.mass_kg = 0.5 * M_SUN;
+    close_companion.orbit = Some(circular(0.1 * AU));
+    desc.stars.push(close_companion);
+
+    let mut wide_companion = sun();
+    wide_companion.mass_kg = 0.3 * M_SUN;
+    wide_companion.orbit = Some(circular(100.0 * AU));
+    desc.stars.push(wide_companion);
+
+    let eph = KeplerSecular::new(desc);
+    let m0 = M_SUN;
+    let m1 = 0.5 * M_SUN;
+
+    let mut origin_displaced = false;
+    for &t in &[0.0, 1.0e6, 1.0e7, 1.0e8] {
+        let s = eph.states_at(t);
+        let bary = [
+            (m0 * s[0].position_m[0] + m1 * s[1].position_m[0]) / (m0 + m1),
+            (m0 * s[0].position_m[1] + m1 * s[1].position_m[1]) / (m0 + m1),
+            (m0 * s[0].position_m[2] + m1 * s[1].position_m[2]) / (m0 + m1),
+        ];
+        let planet_pos = s[3].position_m; // 3 stars precede the planet
+        let d = [
+            planet_pos[0] - bary[0],
+            planet_pos[1] - bary[1],
+            planet_pos[2] - bary[2],
+        ];
+        assert!(
+            (mag(d) - AU).abs() < 1.0e-3 * AU,
+            "t={t}: planet does not ride the close pair's barycenter, |d|={}",
+            mag(d) / AU
+        );
+        if mag(bary) > 5.0 * AU {
+            origin_displaced = true;
+        }
+    }
+    assert!(
+        origin_displaced,
+        "the close pair was never displaced far from the origin by the wide tertiary"
+    );
+}
+
+#[test]
 fn apsidal_drift_rotates_periapsis() {
     let mut desc = single_planet_system();
     desc.planets[0].orbit.eccentricity = 0.3;
