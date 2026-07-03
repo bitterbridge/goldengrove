@@ -1,0 +1,109 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
+import { loadSim, type Sim } from './sim/wasm';
+import { SimClock } from './time/clock';
+import { buildSpaceScene, type SpaceView } from './views/space';
+import { buildHud, formatDate } from './ui/hud';
+import { parseSeedFromHash, randomSeed } from './ui/seed';
+import './styles.css';
+
+const app = document.getElementById('app')!;
+
+async function boot(): Promise<void> {
+  const seed = parseSeedFromHash(location.hash) ?? randomSeed();
+  location.hash = `seed=${seed}`;
+  app.replaceChildren();
+
+  let sim: Sim;
+  try {
+    sim = await loadSim(seed);
+  } catch (err) {
+    const card = document.createElement('div');
+    card.className = 'hud hud-top-left';
+    card.textContent = `This seed found a bug — please report it. (${String(err)})`;
+    app.append(card);
+    return;
+  }
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const labelRenderer = new CSS2DRenderer();
+  labelRenderer.domElement.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
+  app.append(renderer.domElement, labelRenderer.domElement);
+
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.001, 5000);
+  camera.position.set(0, -28, 16);
+  camera.up.set(0, 0, 1); // +Z is system north (sim frame convention)
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+
+  const view: SpaceView = buildSpaceScene(sim);
+  const clock = new SimClock();
+  let trueScale = false;
+  let focused: number | null = null;
+
+  const anchorCal = sim.descriptor.planets[sim.descriptor.anchor_planet]!.calendar!;
+  const hud = buildHud(app, seed, {
+    onPlayPause: () => { clock.paused = !clock.paused; hud.setPaused(clock.paused); },
+    onSpeed: (m) => { clock.speed = m; },
+    onTrueScale: (on) => { trueScale = on; },
+    onReroll: () => { location.hash = `seed=${randomSeed()}`; },
+  });
+
+  function resize(): void {
+    const { clientWidth: w, clientHeight: h } = app;
+    renderer.setSize(w, h);
+    labelRenderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  // click-to-focus (ignore drags)
+  const down = new THREE.Vector2();
+  renderer.domElement.addEventListener('pointerdown', (e) => down.set(e.clientX, e.clientY));
+  renderer.domElement.addEventListener('pointerup', (e) => {
+    if (down.distanceTo(new THREE.Vector2(e.clientX, e.clientY)) > 4) return;
+    const ndc = new THREE.Vector2(
+      (e.clientX / renderer.domElement.clientWidth) * 2 - 1,
+      -(e.clientY / renderer.domElement.clientHeight) * 2 + 1,
+    );
+    const ray = new THREE.Raycaster();
+    ray.params.Line = { threshold: 0.05 };
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(view.bodies, false)[0];
+    focused = hit ? view.bodyIndexOf(hit.object) : focused;
+  });
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') focused = null;
+  });
+  // Full reload on seed change: tearing down renderer/loop/listeners by hand
+  // buys nothing at this app size and invites leaks.
+  addEventListener('hashchange', () => location.reload());
+
+  let lastWall = performance.now();
+  let lastDateUpdate = 0;
+  renderer.setAnimationLoop(() => {
+    const now = performance.now();
+    const dt = Math.min((now - lastWall) / 1000, 0.1); // clamp tab-switch jumps
+    lastWall = now;
+    clock.tick(dt);
+
+    view.update(sim.statesAt(clock.t), trueScale);
+    if (focused !== null) {
+      controls.target.lerp(view.bodies[focused]!.position, 0.15);
+    }
+    controls.update();
+
+    if (now - lastDateUpdate > 250) {
+      lastDateUpdate = now;
+      hud.setDate(formatDate(sim.anchorDate(clock.t), anchorCal));
+    }
+    renderer.render(view.scene, camera);
+    labelRenderer.render(view.scene, camera);
+  });
+}
+
+void boot();
