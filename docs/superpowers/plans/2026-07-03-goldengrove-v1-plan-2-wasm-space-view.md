@@ -12,7 +12,7 @@
 
 - **Determinism contract unchanged**: bit-identical `SystemDescriptor` per seed. Task 1 intentionally breaks goldens ONCE (libm migration) and bumps `SCHEMA_VERSION` to 2; no other task may alter generation output.
 - **Canonical target is wasm32** (spec, Determinism contract section): Task 3's wasm parity test and Task 7's CI make this enforceable.
-- **New Rust deps limited to**: `libm 0.2` (gg-core), `wasm-bindgen 0.2` + `js-sys 0.3` + `serde_json 1` (gg-wasm), `wasm-bindgen-test 0.3` (dev). **New JS deps limited to**: `three ^0.166`, dev: `typescript ~5.5`, `vite ^5.4`, `vitest ^2`, `@types/three ^0.166`, `happy-dom ^15`.
+- **New Rust deps limited to**: `libm 0.2` (gg-core), `wasm-bindgen 0.2` + `js-sys 0.3` + `serde_json 1` (gg-wasm), `wasm-bindgen-test 0.3` (dev). **New JS deps limited to**: `three ^0.166`, dev: `typescript ~5.5`, `vite ^5.4`, `vitest ^2`, `@types/three ^0.166`, `happy-dom ^15`, `@types/node` (types-only; the vitest suites import `node:fs`/`node:path` to read golden fixtures).
 - **WASM boundary is coarse** (spec): construct-once `World`, per-frame `states_at(t) → Float64Array`, static `descriptor_json()`/`orbit_path()`, `anchor_date_json(t)`. No chatty per-object calls.
 - **Flat state layout is contract**: 7 f64 per body — `[x_m, y_m, z_m, axis_x, axis_y, axis_z, rotation_rad]`, body order identical to gg-ephemeris (stars, planets, moons grouped by planet).
 - **Seeds cross the JS boundary as decimal strings** (u64 exceeds JS safe integers; descriptor JSON already serializes seed as string).
@@ -730,7 +730,7 @@ git commit -m "feat: gg-wasm boundary crate with wasm32 golden-parity gate"
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
-    "types": ["vite/client"],
+    "types": ["vite/client", "node"],
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
   "include": ["src"]
