@@ -13,6 +13,7 @@ export interface SpaceView {
   labels: CSS2DObject[];
   update(states: Float64Array, trueScale: boolean): void;
   bodyIndexOf(object: THREE.Object3D): number | null;
+  hostOriginView(): [number, number, number];
 }
 
 interface BodyMeta {
@@ -29,6 +30,24 @@ function bodyRadiusM(sim: Sim, ref: BodyRef): number {
     case 'planet': return sim.descriptor.planets[ref.planet]!.radius_m;
     case 'moon': return sim.descriptor.planets[ref.planet]!.moons[ref.moon]!.radius_m;
   }
+}
+
+/** Host origin in meters from the flat states array (7 f64/body; stars first). */
+function hostOriginM(sim: Sim, states: Float64Array): [number, number, number] {
+  if (sim.descriptor.planet_host === 'Primary') {
+    return [states[0]!, states[1]!, states[2]!];
+  }
+  // Barycenter: mass-weighted close pair (stars 0 and 1) — mirrors the
+  // ephemeris host-origin convention exactly.
+  const m0 = sim.descriptor.stars[0]!.mass_kg;
+  const m1 = sim.descriptor.stars[1]!.mass_kg;
+  const w0 = m0 / (m0 + m1);
+  const w1 = m1 / (m0 + m1);
+  return [
+    w0 * states[0]! + w1 * states[7]!,
+    w0 * states[1]! + w1 * states[8]!,
+    w0 * states[2]! + w1 * states[9]!,
+  ];
 }
 
 export function buildSpaceScene(sim: Sim): SpaceView {
@@ -97,7 +116,7 @@ export function buildSpaceScene(sim: Sim): SpaceView {
     meta.push(m);
   });
 
-  function writeOrbitLine(m: BodyMeta, trueScale: boolean): void {
+  function writeOrbitLine(m: BodyMeta, trueScale: boolean, originM: [number, number, number]): void {
     const line = m.orbitLine;
     if (!line) return;
     const raw = (line as THREE.LineLoop & { __rawPath?: Float64Array }).__rawPath!;
@@ -108,7 +127,12 @@ export function buildSpaceScene(sim: Sim): SpaceView {
         const f = trueScale ? moonViewFactor(0, true) : m.moonFactor;
         [x, y, z] = [raw[k * 3]! * f, raw[k * 3 + 1]! * f, raw[k * 3 + 2]! * f];
       } else {
-        [x, y, z] = compressPosition(raw[k * 3]!, raw[k * 3 + 1]!, raw[k * 3 + 2]!, trueScale);
+        [x, y, z] = compressPosition(
+          raw[k * 3]! + originM[0],
+          raw[k * 3 + 1]! + originM[1],
+          raw[k * 3 + 2]! + originM[2],
+          trueScale,
+        );
       }
       attr.setXYZ(k, x, y, z);
     }
@@ -116,10 +140,18 @@ export function buildSpaceScene(sim: Sim): SpaceView {
   }
 
   let lastTrueScale: boolean | null = null;
+  let lastOriginM: [number, number, number] | null = null;
+  const ORIGIN_REWRITE_THRESHOLD_M = 1e8; // ~0.0007 AU
 
   function update(states: Float64Array, trueScale: boolean): void {
     const rescale = trueScale !== lastTrueScale;
     lastTrueScale = trueScale;
+    const originM = hostOriginM(sim, states);
+    const originMoved =
+      lastOriginM === null ||
+      Math.hypot(originM[0] - lastOriginM[0], originM[1] - lastOriginM[1], originM[2] - lastOriginM[2]) >
+        ORIGIN_REWRITE_THRESHOLD_M;
+    const rewriteOrbitLines = rescale || originMoved;
     // planets/stars first so moon parents are already placed
     meta.forEach((m, i) => {
       if (m.ref.kind === 'moon') return;
@@ -141,12 +173,13 @@ export function buildSpaceScene(sim: Sim): SpaceView {
       );
       applyCommon(m, i, states, trueScale);
       if (m.orbitLine) m.orbitLine.position.copy(bodies[p]!.position);
-      if (rescale) writeOrbitLine(m, trueScale);
+      if (rescale) writeOrbitLine(m, trueScale, originM);
     });
-    if (rescale) {
+    if (rewriteOrbitLines) {
       meta.forEach((m) => {
-        if (m.ref.kind !== 'moon') writeOrbitLine(m, trueScale);
+        if (m.ref.kind !== 'moon') writeOrbitLine(m, trueScale, originM);
       });
+      lastOriginM = originM;
     }
     // star lights follow their star
     scene.traverse((o) => {
@@ -168,5 +201,6 @@ export function buildSpaceScene(sim: Sim): SpaceView {
     labels,
     update,
     bodyIndexOf: (o) => indexByMesh.get(o) ?? null,
+    hostOriginView: () => compressPosition(...(lastOriginM ?? [0, 0, 0]), lastTrueScale ?? false),
   };
 }

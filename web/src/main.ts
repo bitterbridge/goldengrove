@@ -43,6 +43,13 @@ async function boot(): Promise<void> {
   let trueScale = false;
   let focused: number | null = null;
 
+  // Prime the view once so the host origin is known, then frame the camera
+  // on it (trinary systems can have the planet host far from world origin).
+  view.update(sim.statesAt(0), trueScale);
+  const [ox, oy, oz] = view.hostOriginView();
+  controls.target.set(ox, oy, oz);
+  camera.position.set(ox, oy - 28, oz + 16);
+
   const anchorCal = sim.descriptor.planets[sim.descriptor.anchor_planet]!.calendar!;
   const hud = buildHud(app, seed, {
     onPlayPause: () => { clock.paused = !clock.paused; hud.setPaused(clock.paused); },
