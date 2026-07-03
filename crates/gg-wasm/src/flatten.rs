@@ -63,3 +63,24 @@ pub fn orbit_path_points(desc: &SystemDescriptor, body_index: usize, segments: u
     }
     out
 }
+
+/// Host origin (the point planets orbit) at time t, meters.
+/// THE single authority for this convention — the web layer must consume
+/// this value, never reimplement it (it drifted once already).
+pub fn host_origin_at(eph: &KeplerSecular, t_s: f64) -> [f64; 3] {
+    let states = eph.states_at(t_s);
+    let desc = eph.desc();
+    match desc.planet_host {
+        PlanetHost::Primary => states[0].position_m,
+        PlanetHost::Barycenter => {
+            let (m0, m1) = (desc.stars[0].mass_kg, desc.stars[1].mass_kg);
+            let (p0, p1) = (states[0].position_m, states[1].position_m);
+            let w = m0 + m1;
+            [
+                (m0 * p0[0] + m1 * p1[0]) / w,
+                (m0 * p0[1] + m1 * p1[1]) / w,
+                (m0 * p0[2] + m1 * p1[2]) / w,
+            ]
+        }
+    }
+}

@@ -42,6 +42,9 @@ fn world_boundary_marshals_correctly() {
     // anchor date parses and starts at year 0
     let date: serde_json::Value = serde_json::from_str(&w.anchor_date_json(0.0)).unwrap();
     assert_eq!(date["year"].as_u64().unwrap(), 0);
+    let origin = w.host_origin_at(1.0e7);
+    assert_eq!(origin.length(), 3);
+    assert!(origin.to_vec().iter().all(|v| v.is_finite()));
 }
 
 #[wasm_bindgen_test]

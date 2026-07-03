@@ -9,6 +9,7 @@ export interface Sim {
   statesAt(tS: number): Float64Array;
   orbitPath(bodyIndex: number, segments: number): Float64Array;
   anchorDate(tS: number): DateTime;
+  hostOriginAt(tS: number): Float64Array;
 }
 
 let wasmReady: Promise<unknown> | null = null;
@@ -33,5 +34,6 @@ export async function loadSim(seed: string): Promise<Sim> {
     statesAt: (tS) => world.states_at(tS),
     orbitPath: (i, segments) => world.orbit_path(i, segments),
     anchorDate: (tS) => JSON.parse(world.anchor_date_json(tS)) as DateTime,
+    hostOriginAt: (tS) => world.host_origin_at(tS),
   };
 }

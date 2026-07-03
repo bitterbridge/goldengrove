@@ -11,7 +11,7 @@ export interface SpaceView {
   scene: THREE.Scene;
   bodies: THREE.Mesh[];
   labels: CSS2DObject[];
-  update(states: Float64Array, trueScale: boolean): void;
+  update(states: Float64Array, trueScale: boolean, originM: Float64Array): void;
   bodyIndexOf(object: THREE.Object3D): number | null;
   hostOriginView(): [number, number, number];
 }
@@ -30,24 +30,6 @@ function bodyRadiusM(sim: Sim, ref: BodyRef): number {
     case 'planet': return sim.descriptor.planets[ref.planet]!.radius_m;
     case 'moon': return sim.descriptor.planets[ref.planet]!.moons[ref.moon]!.radius_m;
   }
-}
-
-/** Host origin in meters from the flat states array (7 f64/body; stars first). */
-function hostOriginM(sim: Sim, states: Float64Array): [number, number, number] {
-  if (sim.descriptor.planet_host === 'Primary') {
-    return [states[0]!, states[1]!, states[2]!];
-  }
-  // Barycenter: mass-weighted close pair (stars 0 and 1) — mirrors the
-  // ephemeris host-origin convention exactly.
-  const m0 = sim.descriptor.stars[0]!.mass_kg;
-  const m1 = sim.descriptor.stars[1]!.mass_kg;
-  const w0 = m0 / (m0 + m1);
-  const w1 = m1 / (m0 + m1);
-  return [
-    w0 * states[0]! + w1 * states[7]!,
-    w0 * states[1]! + w1 * states[8]!,
-    w0 * states[2]! + w1 * states[9]!,
-  ];
 }
 
 export function buildSpaceScene(sim: Sim): SpaceView {
@@ -139,7 +121,7 @@ export function buildSpaceScene(sim: Sim): SpaceView {
   let lastTrueScale: boolean | null = null;
   let lastOriginView: [number, number, number] = [0, 0, 0];
 
-  function update(states: Float64Array, trueScale: boolean): void {
+  function update(states: Float64Array, trueScale: boolean, originM: Float64Array): void {
     const rescale = trueScale !== lastTrueScale;
     lastTrueScale = trueScale;
     // Host-origin-centric compression: compress each body's OFFSET from the
@@ -148,16 +130,15 @@ export function buildSpaceScene(sim: Sim): SpaceView {
     // structure readable instead of being crushed by the asinh slope out
     // there. For originM ≈ 0 and for true scale (linear, additive) this
     // matches the old absolute behavior exactly.
-    const originM = hostOriginM(sim, states);
-    const originView = compressPosition(originM[0], originM[1], originM[2], trueScale);
+    const originView = compressPosition(originM[0]!, originM[1]!, originM[2]!, trueScale);
     lastOriginView = originView;
     // planets/stars first so moon parents are already placed
     meta.forEach((m, i) => {
       if (m.ref.kind === 'moon') return;
       const [x, y, z] = compressPosition(
-        states[i * 7]! - originM[0],
-        states[i * 7 + 1]! - originM[1],
-        states[i * 7 + 2]! - originM[2],
+        states[i * 7]! - originM[0]!,
+        states[i * 7 + 1]! - originM[1]!,
+        states[i * 7 + 2]! - originM[2]!,
         trueScale,
       );
       bodies[i]!.position.set(originView[0] + x, originView[1] + y, originView[2] + z);

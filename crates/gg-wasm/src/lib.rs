@@ -41,6 +41,11 @@ impl World {
         js_sys::Float64Array::from(orbit_path_points(self.eph.desc(), body_index, segments).as_slice())
     }
 
+    /// [x, y, z] of the point planets orbit, meters.
+    pub fn host_origin_at(&self, t_s: f64) -> js_sys::Float64Array {
+        js_sys::Float64Array::from(flatten::host_origin_at(&self.eph, t_s).as_slice())
+    }
+
     /// Anchor planet's calendar date at t.
     pub fn anchor_date_json(&self, t_s: f64) -> String {
         let desc = self.eph.desc();

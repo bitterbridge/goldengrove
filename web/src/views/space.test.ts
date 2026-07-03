@@ -17,7 +17,7 @@ const golden = parseDescriptor(readFileSync(goldenPath, 'utf8'));
 function fakeSim(): Sim {
   const layoutLen =
     golden.stars.length + golden.planets.length + golden.planets.reduce((n, p) => n + p.moons.length, 0);
-  return {
+  const fake: Sim = {
     seed: golden.seed,
     descriptor: golden,
     bodyCount: layoutLen,
@@ -40,7 +40,22 @@ function fakeSim(): Sim {
       return out;
     },
     anchorDate: () => ({ year: 0, day_of_year: 0, day_fraction: 0 }),
+    hostOriginAt: (tS) => {
+      // Mass-weighted barycenter of the close pair (stars 0 and 1) computed
+      // from this same fake's statesAt — mirrors the real Sim.hostOriginAt
+      // contract (golden seed-42 has 2 stars, host is Barycenter).
+      const s = fake.statesAt(tS);
+      const m0 = golden.stars[0]!.mass_kg;
+      const m1 = golden.stars[1]!.mass_kg;
+      const w = m0 + m1;
+      return new Float64Array([
+        (m0 * s[0]! + m1 * s[7]!) / w,
+        (m0 * s[1]! + m1 * s[8]!) / w,
+        (m0 * s[2]! + m1 * s[9]!) / w,
+      ]);
+    },
   };
+  return fake;
 }
 
 /**
@@ -54,7 +69,7 @@ function fakeSimWithDisplacedStars(): Sim {
   const layoutLen =
     golden.stars.length + golden.planets.length + golden.planets.reduce((n, p) => n + p.moons.length, 0);
   const STAR_OFFSET: [number, number, number] = [5e11, 0, 0];
-  return {
+  const fake: Sim = {
     seed: golden.seed,
     descriptor: golden,
     bodyCount: layoutLen,
@@ -85,7 +100,21 @@ function fakeSimWithDisplacedStars(): Sim {
       return out;
     },
     anchorDate: () => ({ year: 0, day_of_year: 0, day_fraction: 0 }),
+    hostOriginAt: (tS) => {
+      // Mass-weighted barycenter of the close pair (stars 0 and 1) computed
+      // from this same fake's statesAt.
+      const s = fake.statesAt(tS);
+      const m0 = golden.stars[0]!.mass_kg;
+      const m1 = golden.stars[1]!.mass_kg;
+      const w = m0 + m1;
+      return new Float64Array([
+        (m0 * s[0]! + m1 * s[7]!) / w,
+        (m0 * s[1]! + m1 * s[8]!) / w,
+        (m0 * s[2]! + m1 * s[9]!) / w,
+      ]);
+    },
   };
+  return fake;
 }
 
 describe('buildSpaceScene', () => {
@@ -101,7 +130,7 @@ describe('buildSpaceScene', () => {
   it('update() positions meshes and never leaves NaNs', () => {
     const sim = fakeSim();
     const view = buildSpaceScene(sim);
-    view.update(sim.statesAt(0), false);
+    view.update(sim.statesAt(0), false, sim.hostOriginAt(0));
     for (const mesh of view.bodies) {
       expect(Number.isFinite(mesh.position.x)).toBe(true);
       expect(mesh.position.length()).toBeGreaterThan(0);
@@ -119,7 +148,8 @@ describe('buildSpaceScene', () => {
     const sim = fakeSim();
     const view = buildSpaceScene(sim);
     const states = sim.statesAt(0);
-    view.update(states, false);
+    const originM = sim.hostOriginAt(0);
+    view.update(states, false, originM);
 
     const lines = view.scene.getObjectByName('orbit-lines')!;
     const firstLine = lines.children[0] as THREE.LineLoop;
@@ -128,11 +158,11 @@ describe('buildSpaceScene', () => {
     expect(Number.isFinite(compressedX)).toBe(true);
     expect(compressedX).not.toBe(0); // first frame wrote vertices
 
-    view.update(states, true); // flip to true scale
+    view.update(states, true, originM); // flip to true scale
     const trueX = attr.getX(1);
     expect(trueX).not.toBeCloseTo(compressedX, 6); // vertices rewritten
 
-    view.update(states, false); // flip back
+    view.update(states, false, originM); // flip back
     expect(attr.getX(1)).toBeCloseTo(compressedX, 6);
 
     // star point-light follows its star mesh
@@ -160,7 +190,8 @@ describe('buildSpaceScene', () => {
     const sim = fakeSimWithDisplacedStars();
     const view = buildSpaceScene(sim);
     const states = sim.statesAt(0);
-    view.update(states, false);
+    const originMArr = sim.hostOriginAt(0);
+    view.update(states, false, originMArr);
 
     // mass-weighted barycenter of the close pair (stars 0 and 1) — same
     // formula the fix uses to compute the planet host origin.
@@ -216,7 +247,7 @@ describe('buildSpaceScene', () => {
 
     // flip trueScale: vertices rewrite with true-scale compression and the
     // line follows the true-scale originView
-    view.update(states, true);
+    view.update(states, true, originMArr);
     const originViewTrue = compressPosition(originM[0], originM[1], originM[2], true);
     expect(firstLine.position.x).toBeCloseTo(originViewTrue[0], 4);
     expected = compressPosition(raw[0]!, raw[1]!, raw[2]!, true);

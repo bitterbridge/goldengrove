@@ -112,3 +112,37 @@ fn orbit_path_origins_and_indexing_agree_with_ephemeris_at_epoch() {
     }
     assert!(checked_barycenter, "no circumbinary system in seed range — widen it");
 }
+
+#[test]
+fn host_origin_matches_ephemeris_convention() {
+    use gg_gen::descriptor::PlanetHost;
+    let mut saw_barycenter = false;
+    for seed in 0..120u64 {
+        let desc = gg_gen::generate(seed);
+        let host = desc.planet_host;
+        let eph = KeplerSecular::new(desc);
+        for &t in &[0.0, 1.0e7, 3.0e9] {
+            let origin = gg_wasm::flatten::host_origin_at(&eph, t);
+            let states = eph.states_at(t);
+            let d = eph.desc();
+            let expected = match host {
+                PlanetHost::Primary => states[0].position_m,
+                PlanetHost::Barycenter => {
+                    let (m0, m1) = (d.stars[0].mass_kg, d.stars[1].mass_kg);
+                    let (p0, p1) = (states[0].position_m, states[1].position_m);
+                    let w = m0 + m1;
+                    [
+                        (m0 * p0[0] + m1 * p1[0]) / w,
+                        (m0 * p0[1] + m1 * p1[1]) / w,
+                        (m0 * p0[2] + m1 * p1[2]) / w,
+                    ]
+                }
+            };
+            assert_eq!(origin, expected, "seed {seed} t {t}");
+        }
+        if host == PlanetHost::Barycenter {
+            saw_barycenter = true;
+        }
+    }
+    assert!(saw_barycenter);
+}
