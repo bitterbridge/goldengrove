@@ -3,9 +3,22 @@ use serde::{Deserialize, Serialize};
 
 pub const SCHEMA_VERSION: u32 = 1;
 
+/// u64 <-> JSON string: JS Numbers lose precision above 2^53.
+mod seed_string {
+    use serde::{Deserialize, Deserializer, Serializer};
+    pub fn serialize<S: Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Error> {
+        s.collect_str(v)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<u64, D::Error> {
+        let s = String::deserialize(d)?;
+        s.parse().map_err(serde::de::Error::custom)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SystemDescriptor {
     pub schema_version: u32,
+    #[serde(with = "seed_string")]
     pub seed: u64,
     pub age_s: f64,
     pub stars: Vec<Star>,
@@ -50,6 +63,7 @@ pub enum PlanetClass {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
 pub enum WorldState {
     Living,
     Dead,
