@@ -55,7 +55,7 @@ web/                           # NEW: Vite + TS + three.js app
 
 **Interfaces:**
 - Consumes: existing gg-core/gg-gen code.
-- Produces: `gg_core::math::{powf, ln, exp, cbrt}` — all `(f64, …) -> f64`, `#[inline]`. Every generation-path transcendental call goes through these from now on (binding on all future tasks/plans).
+- Produces: `gg_core::math::{powf, ln, exp, cbrt, cos}` — all `(f64, …) -> f64`, `#[inline]`. Every generation-path transcendental call goes through these from now on (binding on all future tasks/plans).
 
 Why: Rust's std float methods call the platform's libm on native targets but Rust-internal implementations on wasm32; results differ by ULPs, and serde_json's shortest-roundtrip float printing turns 1 ULP into different descriptor bytes. The spec records wasm32 as the canonical target. `libm` (rust-lang's pure-Rust port) computes identical bits on every target using only IEEE-exact primitive ops. `sqrt`, `powi`, `floor`, `round`, `fract`, `rem_euclid` are IEEE-exact everywhere and stay as-is. gg-ephemeris keeps std math deliberately — its output is per-frame rendering, never byte-pinned.
 
@@ -118,6 +118,11 @@ pub fn exp(x: f64) -> f64 {
 pub fn cbrt(x: f64) -> f64 {
     libm::cbrt(x)
 }
+
+#[inline]
+pub fn cos(x: f64) -> f64 {
+    libm::cos(x)
+}
 ```
 
 Add `pub mod math;` to `crates/gg-core/src/lib.rs`.
@@ -127,9 +132,9 @@ Migrate call sites — mechanical, value-for-value (`x.powf(y)` → `math::powf(
 - `crates/gg-core/src/rng.rs`: `log_uniform` (`ln`, `exp`), `power_law` (three `powf`).
 - `crates/gg-gen/src/stars.rs`: `luminosity_w` (three `powf`), `radius_m` (two `powf`), `temperature_k` (`powf(…, 0.25)`), `ms_lifetime_s` (`powf`), and the HZ `sqrt` stays std (exact).
 - `crates/gg-gen/src/planets.rs`: `rocky_radius` (`powf`), ice-giant radius (`powf`), the mutual-Hill `cbrt` in both `generate_planets`/`enforce_hill_spacing` paths and the spacing `k_of` closure.
-- `crates/gg-gen/src/moons.rs`: `hill_radius_m` (`cbrt`), `roche_limit_m` (`cbrt`), the moon-radius `cbrt` in `generate_moons`.
+- `crates/gg-gen/src/moons.rs`: `hill_radius_m` (`cbrt`), `roche_limit_m` (`cbrt`), the moon-radius `cbrt` in `generate_moons`, AND the three `.cos()` sites (nodal regression from `orbit.inclination_rad`; axial-precession tilt terms in `moon_physics` and `generate_moons`) -> `math::cos` — they feed `nodal_rad_per_s` and `axial_precession_rad_per_s`, which are byte-pinned.
 
-Leave every `sqrt`, `powi`, `sin_cos`, `sin`, `cos` untouched (`sin_cos`/`sin`/`cos` do not occur in generation paths — verify with `grep -n "sin\|cos" crates/gg-gen/src/*.rs crates/gg-core/src/rng.rs`; if any hit IS in a generation path, stop and report BLOCKED).
+Leave every `sqrt`, `powi`, `sin_cos`, `sin` untouched in gg-core/orbit.rs and gg-ephemeris (render-path only). Generation-path `.cos()` sites (the three in moons.rs) migrate to `math::cos`. After migrating, `grep -n "\.cos()\|\.sin()" crates/gg-gen/src/*.rs crates/gg-core/src/rng.rs` must return zero hits.
 
 Set `SCHEMA_VERSION` to 2 in `crates/gg-gen/src/descriptor.rs` and update its doc comment: `/// v2: generation math moved to libm (wasm32-canonical determinism).`
 
