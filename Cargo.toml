@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/gg-core", "crates/gg-gen", "crates/gg-ephemeris"]
+resolver = "2"
