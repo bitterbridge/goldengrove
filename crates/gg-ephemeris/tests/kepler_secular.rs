@@ -163,3 +163,51 @@ fn spin_axis_precesses_and_rotation_advances() {
     // rotation angle advances
     assert!(s0[1].rotation_rad != s1[1].rotation_rad);
 }
+
+#[test]
+fn body_order_contract_with_multiple_planets_and_moons() {
+    let mut desc = single_planet_system();
+    // planet 0 at 1 AU with 0 moons; planet 1 at 2 AU with 2 moons; planet 2 at 4 AU with 1 moon
+    desc.planets.push(bare_planet(2.0 * AU));
+    desc.planets.push(bare_planet(4.0 * AU));
+    let make_moon = |a: f64| Moon {
+        mass_kg: 7.3e22,
+        radius_m: 1.7e6,
+        orbit: circular(a),
+        secular: SecularRates::default(),
+        tidally_locked: true,
+        rotation_period_s: 2.36e6,
+        doom_time_s: None,
+    };
+    desc.planets[1].moons.push(make_moon(3.0e8));
+    desc.planets[1].moons.push(make_moon(6.0e8));
+    desc.planets[2].moons.push(make_moon(4.0e8));
+
+    let eph = KeplerSecular::new(desc.clone());
+    // 1 star + 3 planets + 3 moons
+    assert_eq!(eph.body_count(), 7);
+    let states = eph.states_at(1.0e7);
+    assert_eq!(states.len(), 7);
+
+    // index helpers agree with the layout
+    assert_eq!(star_index(0), 0);
+    assert_eq!(planet_index(&desc, 0), 1);
+    assert_eq!(planet_index(&desc, 2), 3);
+    assert_eq!(moon_index(&desc, 1, 0), 4);
+    assert_eq!(moon_index(&desc, 1, 1), 5);
+    assert_eq!(moon_index(&desc, 2, 0), 6);
+
+    // each moon sits at its own orbital radius from ITS planet (proves grouping)
+    for (pi, mi, a) in [(1usize, 0usize, 3.0e8), (1, 1, 6.0e8), (2, 0, 4.0e8)] {
+        let p = states[planet_index(&desc, pi)].position_m;
+        let m = states[moon_index(&desc, pi, mi)].position_m;
+        let d = [m[0] - p[0], m[1] - p[1], m[2] - p[2]];
+        assert!((mag(d) - a).abs() < 1.0e3, "moon {mi} of planet {pi}");
+    }
+
+    // planets ordered by descriptor order, radii increasing per construction
+    let r1 = mag(states[planet_index(&desc, 0)].position_m);
+    let r2 = mag(states[planet_index(&desc, 1)].position_m);
+    let r3 = mag(states[planet_index(&desc, 2)].position_m);
+    assert!(r1 < r2 && r2 < r3);
+}
