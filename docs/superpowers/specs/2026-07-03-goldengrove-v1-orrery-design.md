@@ -89,6 +89,11 @@ makes shared links eternal, so it is a hard contract:
 - No iteration-order-dependent collections in generation paths.
 - Golden-file tests pin descriptor bytes for known seeds; an intentional break
   requires a schema version bump.
+- Transcendental functions (`powf`, `sin_cos`, …) may differ by ULPs between
+  native libm and wasm32. The canonical determinism target is the wasm32
+  build (all users share one binary). Plan 2 must run the golden-file check
+  under wasm32 in CI; if native and wasm outputs diverge, generation-path
+  math moves to the `libm` crate and goldens regenerate (schema bump).
 
 ## Generation Model
 
