@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "seed": 1,
+  "seed": "1",
   "age_s": 1.0473997763154722e+17,
   "stars": [
     {
@@ -35,7 +35,9 @@
       "axial_precession_rad_per_s": 4.399576150825476e-9,
       "rotation_period_s": 51694.73895005676,
       "spin_drift_s_per_s": 0.0,
-      "state": "Living",
+      "state": {
+        "kind": "Living"
+      },
       "moons": [],
       "calendar": null
     },
@@ -60,7 +62,9 @@
       "axial_precession_rad_per_s": 3.206660996550735e-10,
       "rotation_period_s": 155004.17553067833,
       "spin_drift_s_per_s": 0.0,
-      "state": "Living",
+      "state": {
+        "kind": "Living"
+      },
       "moons": [],
       "calendar": null
     },
@@ -85,7 +89,9 @@
       "axial_precession_rad_per_s": 2.762773222844522e-10,
       "rotation_period_s": 161572.22369711392,
       "spin_drift_s_per_s": 5.276072974893167e-9,
-      "state": "Living",
+      "state": {
+        "kind": "Living"
+      },
       "moons": [
         {
           "mass_kg": 6.765828982894185e+22,
@@ -177,7 +183,9 @@
       "axial_precession_rad_per_s": 2.555817630753671e-11,
       "rotation_period_s": 52000.821253249924,
       "spin_drift_s_per_s": 0.0,
-      "state": "Living",
+      "state": {
+        "kind": "Living"
+      },
       "moons": [],
       "calendar": null
     },
@@ -199,10 +207,12 @@
         "migration_m_per_s": 0.0
       },
       "axial_tilt_rad": 0.521244760890643,
-      "axial_precession_rad_per_s": 1.9137665419395858e-11,
+      "axial_precession_rad_per_s": 1.9118925848897226e-11,
       "rotation_period_s": 63920.51824642687,
-      "spin_drift_s_per_s": 3.8121964795716195e-12,
-      "state": "Living",
+      "spin_drift_s_per_s": 3.812190168095813e-12,
+      "state": {
+        "kind": "Living"
+      },
       "moons": [
         {
           "mass_kg": 4.978339886262044e+22,
@@ -263,26 +273,6 @@
           "tidally_locked": true,
           "rotation_period_s": 2104591.9352497864,
           "doom_time_s": null
-        },
-        {
-          "mass_kg": 3.7538110849564554e+22,
-          "radius_m": 1440193.5098774391,
-          "orbit": {
-            "semi_major_axis_m": 2190632093.391198,
-            "eccentricity": 0.039002764990611685,
-            "inclination_rad": 0.0015672149966642656,
-            "raan_rad": 0.18728290730836467,
-            "arg_periapsis_rad": 3.94311529144438,
-            "mean_anomaly_epoch_rad": 1.6489935313267947
-          },
-          "secular": {
-            "apsidal_rad_per_s": 3.323031199911513e-8,
-            "nodal_rad_per_s": -1.582395809481673e-8,
-            "migration_m_per_s": 1.0632005156921005e-9
-          },
-          "tidally_locked": true,
-          "rotation_period_s": 4686857.756241745,
-          "doom_time_s": null
         }
       ],
       "calendar": null
@@ -308,7 +298,9 @@
       "axial_precession_rad_per_s": 8.078305012187974e-13,
       "rotation_period_s": 55831.17564045582,
       "spin_drift_s_per_s": 2.895164644626431e-14,
-      "state": "Living",
+      "state": {
+        "kind": "Living"
+      },
       "moons": [
         {
           "mass_kg": 1.4880036257204284e+21,
@@ -414,7 +406,9 @@
       "axial_precession_rad_per_s": 9.128558938660944e-12,
       "rotation_period_s": 49361.275472368245,
       "spin_drift_s_per_s": 1.2930660943256649e-14,
-      "state": "Living",
+      "state": {
+        "kind": "Living"
+      },
       "moons": [
         {
           "mass_kg": 1.9586029400832085e+24,
@@ -477,10 +471,12 @@
         "migration_m_per_s": 0.0
       },
       "axial_tilt_rad": 0.43215707098277106,
-      "axial_precession_rad_per_s": 2.0301828468680225e-12,
+      "axial_precession_rad_per_s": 1.981279598213684e-12,
       "rotation_period_s": 32885.5621245236,
-      "spin_drift_s_per_s": 1.491881205521944e-13,
-      "state": "Living",
+      "spin_drift_s_per_s": 1.4917998269010404e-13,
+      "state": {
+        "kind": "Living"
+      },
       "moons": [
         {
           "mass_kg": 1.1779746059191093e+21,
@@ -541,26 +537,6 @@
           "tidally_locked": true,
           "rotation_period_s": 1463869.9124044625,
           "doom_time_s": null
-        },
-        {
-          "mass_kg": 2.4623475110377377e+22,
-          "radius_m": 1251352.9649181915,
-          "orbit": {
-            "semi_major_axis_m": 1752050141.8479016,
-            "eccentricity": 0.015968413659335816,
-            "inclination_rad": 0.007282765661355611,
-            "raan_rad": 4.059300604438528,
-            "arg_periapsis_rad": 1.692835515261295,
-            "mean_anomaly_epoch_rad": 5.394514600334719
-          },
-          "secular": {
-            "apsidal_rad_per_s": 2.2061346196621972e-13,
-            "nodal_rad_per_s": -1.0505402950772367e-13,
-            "migration_m_per_s": 2.994363617689557e-11
-          },
-          "tidally_locked": true,
-          "rotation_period_s": 5488642.8840693245,
-          "doom_time_s": null
         }
       ],
       "calendar": null
@@ -586,7 +562,9 @@
       "axial_precession_rad_per_s": 2.510249389669225e-18,
       "rotation_period_s": 145134.68065838295,
       "spin_drift_s_per_s": 0.0,
-      "state": "Living",
+      "state": {
+        "kind": "Living"
+      },
       "moons": [],
       "calendar": null
     }

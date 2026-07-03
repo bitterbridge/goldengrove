@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "seed": 123456789,
+  "seed": "123456789",
   "age_s": 7.1051001508061784e+16,
   "stars": [
     {
@@ -50,7 +50,9 @@
       "axial_precession_rad_per_s": 6.095511086075432e-10,
       "rotation_period_s": 95258.1166008329,
       "spin_drift_s_per_s": 0.0,
-      "state": "Living",
+      "state": {
+        "kind": "Living"
+      },
       "moons": [],
       "calendar": null
     },
@@ -75,7 +77,9 @@
       "axial_precession_rad_per_s": 4.8328906469110874e-11,
       "rotation_period_s": 129785.45029907947,
       "spin_drift_s_per_s": 0.0,
-      "state": "Living",
+      "state": {
+        "kind": "Living"
+      },
       "moons": [],
       "calendar": null
     },
@@ -100,7 +104,9 @@
       "axial_precession_rad_per_s": 9.96578809582586e-12,
       "rotation_period_s": 63041.75915018035,
       "spin_drift_s_per_s": 0.0,
-      "state": "Living",
+      "state": {
+        "kind": "Living"
+      },
       "moons": [],
       "calendar": null
     },
@@ -125,7 +131,9 @@
       "axial_precession_rad_per_s": 2.1655532819459585e-12,
       "rotation_period_s": 74456.4272571615,
       "spin_drift_s_per_s": 0.0,
-      "state": "Living",
+      "state": {
+        "kind": "Living"
+      },
       "moons": [],
       "calendar": null
     },
@@ -151,9 +159,8 @@
       "rotation_period_s": 119236.98765656073,
       "spin_drift_s_per_s": 0.0,
       "state": {
-        "Doomed": {
-          "doom_time_s": 4617761845489.181
-        }
+        "kind": "Doomed",
+        "doom_time_s": 4617761845489.181
       },
       "moons": [],
       "calendar": {
@@ -200,7 +207,9 @@
       "axial_precession_rad_per_s": 7.672360663635206e-11,
       "rotation_period_s": 79874.02656555663,
       "spin_drift_s_per_s": 8.624613535015464e-10,
-      "state": "Living",
+      "state": {
+        "kind": "Living"
+      },
       "moons": [
         {
           "mass_kg": 6.740149456461329e+21,
@@ -243,10 +252,12 @@
         "migration_m_per_s": 0.0
       },
       "axial_tilt_rad": 0.5472313470596851,
-      "axial_precession_rad_per_s": 4.920628597460687e-13,
+      "axial_precession_rad_per_s": 4.907888169928002e-13,
       "rotation_period_s": 59600.0660234848,
-      "spin_drift_s_per_s": 1.948334568241721e-15,
-      "state": "Living",
+      "spin_drift_s_per_s": 1.9483269865546985e-15,
+      "state": {
+        "kind": "Living"
+      },
       "moons": [
         {
           "mass_kg": 4.62165990974072e+22,
@@ -307,46 +318,6 @@
           "tidally_locked": true,
           "rotation_period_s": 2446879.1665959195,
           "doom_time_s": null
-        },
-        {
-          "mass_kg": 7.120798071189966e+22,
-          "radius_m": 1782814.9562967978,
-          "orbit": {
-            "semi_major_axis_m": 7413063063.479106,
-            "eccentricity": 0.04246692254610412,
-            "inclination_rad": 0.048411281563551026,
-            "raan_rad": 1.4369918193637203,
-            "arg_periapsis_rad": 2.0379171832815506,
-            "mean_anomaly_epoch_rad": 5.851386962836985
-          },
-          "secular": {
-            "apsidal_rad_per_s": 5.774939509468604e-10,
-            "nodal_rad_per_s": -2.749971194985049e-10,
-            "migration_m_per_s": 6.008535664382879e-13
-          },
-          "tidally_locked": true,
-          "rotation_period_s": 8550620.090709595,
-          "doom_time_s": null
-        },
-        {
-          "mass_kg": 3.557979503455894e+23,
-          "radius_m": 3047879.966108981,
-          "orbit": {
-            "semi_major_axis_m": 18625320049.65939,
-            "eccentricity": 0.02303711830063759,
-            "inclination_rad": 0.08509860902850697,
-            "raan_rad": 2.2572419532550416,
-            "arg_periapsis_rad": 3.0776312228654197,
-            "mean_anomaly_epoch_rad": 2.270091609932154
-          },
-          "secular": {
-            "apsidal_rad_per_s": 2.2942524150297526e-9,
-            "nodal_rad_per_s": -1.0925011500141678e-9,
-            "migration_m_per_s": 1.8917343184123507e-14
-          },
-          "tidally_locked": false,
-          "rotation_period_s": 85922.29430248326,
-          "doom_time_s": null
         }
       ],
       "calendar": null
@@ -369,109 +340,91 @@
         "migration_m_per_s": 0.0
       },
       "axial_tilt_rad": 0.007147770955818655,
-      "axial_precession_rad_per_s": 5.529522652889691e-12,
+      "axial_precession_rad_per_s": 5.773266183144452e-12,
       "rotation_period_s": 49430.57465412493,
-      "spin_drift_s_per_s": 2.362143523100568e-13,
-      "state": "Living",
+      "spin_drift_s_per_s": 7.581216599383006e-14,
+      "state": {
+        "kind": "Living"
+      },
       "moons": [
         {
-          "mass_kg": 1.853009332720318e+22,
-          "radius_m": 1138210.4822256472,
+          "mass_kg": 4.086925255580157e+22,
+          "radius_m": 1481593.089525852,
           "orbit": {
-            "semi_major_axis_m": 325593904.8457353,
-            "eccentricity": 0.042924527801660464,
-            "inclination_rad": 0.017414016283270037,
-            "raan_rad": 5.826634037012885,
-            "arg_periapsis_rad": 6.057546213937744,
-            "mean_anomaly_epoch_rad": 0.9486207133876398
+            "semi_major_axis_m": 451945434.9649496,
+            "eccentricity": 0.04567103993320604,
+            "inclination_rad": 0.05636877821329437,
+            "raan_rad": 1.6146994687231389,
+            "arg_periapsis_rad": 2.221117060116452,
+            "mean_anomaly_epoch_rad": 3.3712845300126837
           },
           "secular": {
-            "apsidal_rad_per_s": 1.9211382851012084e-12,
-            "nodal_rad_per_s": -9.148277548100993e-13,
-            "migration_m_per_s": 0.000014190801940196337
+            "apsidal_rad_per_s": 3.137247258259156e-12,
+            "nodal_rad_per_s": -1.4939272658376933e-12,
+            "migration_m_per_s": 5.1555199231290814e-6
           },
           "tidally_locked": true,
-          "rotation_period_s": 191485.1431083901,
+          "rotation_period_s": 313148.0346247438,
           "doom_time_s": null
         },
         {
-          "mass_kg": 2.499180633466085e+22,
-          "radius_m": 1257561.5806915055,
+          "mass_kg": 1.3046761889342556e+23,
+          "radius_m": 2181545.577228094,
           "orbit": {
-            "semi_major_axis_m": 552501321.0548776,
-            "eccentricity": 0.012734453255017488,
-            "inclination_rad": 0.005638707374091997,
-            "raan_rad": 5.664286310564602,
-            "arg_periapsis_rad": 5.536300890700523,
-            "mean_anomaly_epoch_rad": 3.8032234564224314
+            "semi_major_axis_m": 810559197.7620215,
+            "eccentricity": 0.07712707383646303,
+            "inclination_rad": 0.013587990808950267,
+            "raan_rad": 0.6088604155195109,
+            "arg_periapsis_rad": 2.7737539439845587,
+            "mean_anomaly_epoch_rad": 1.0001616198361392
           },
           "secular": {
-            "apsidal_rad_per_s": 4.247204350521952e-12,
-            "nodal_rad_per_s": -2.0224782621533102e-12,
-            "migration_m_per_s": 1.0442709071247999e-6
+            "apsidal_rad_per_s": 7.54652636725282e-12,
+            "nodal_rad_per_s": -3.5935839844061046e-12,
+            "migration_m_per_s": 6.622705943346383e-7
           },
           "tidally_locked": true,
-          "rotation_period_s": 423273.09665825305,
+          "rotation_period_s": 752138.4516675835,
           "doom_time_s": null
         },
         {
-          "mass_kg": 5.690909859875048e+22,
-          "radius_m": 1654463.8447806318,
+          "mass_kg": 1.1949128258757891e+23,
+          "radius_m": 2118566.592160757,
           "orbit": {
-            "semi_major_axis_m": 1412157333.7713063,
-            "eccentricity": 0.04477574291557899,
-            "inclination_rad": 0.017305737627608283,
-            "raan_rad": 0.8232981222929259,
-            "arg_periapsis_rad": 1.8409827072168872,
-            "mean_anomaly_epoch_rad": 2.8766871359520536
+            "semi_major_axis_m": 1347678117.8143322,
+            "eccentricity": 0.0704903722559241,
+            "inclination_rad": 0.05447716314954062,
+            "raan_rad": 6.006315265279243,
+            "arg_periapsis_rad": 4.29394754166992,
+            "mean_anomaly_epoch_rad": 3.5166786250652042
           },
           "secular": {
-            "apsidal_rad_per_s": 1.735280444552733e-11,
-            "nodal_rad_per_s": -8.26324021215587e-12,
-            "migration_m_per_s": 1.363557734821223e-8
+            "apsidal_rad_per_s": 1.6156399568346918e-11,
+            "nodal_rad_per_s": -7.693523603974722e-12,
+            "migration_m_per_s": 3.702209975993664e-8
           },
           "tidally_locked": true,
-          "rotation_period_s": 1729598.5519845742,
+          "rotation_period_s": 1612500.8399602058,
           "doom_time_s": null
         },
         {
-          "mass_kg": 2.290154136764703e+22,
-          "radius_m": 1221476.032291819,
+          "mass_kg": 8.694863053667389e+21,
+          "radius_m": 884472.4178431025,
           "orbit": {
-            "semi_major_axis_m": 3436993039.520808,
-            "eccentricity": 0.023362331703195575,
-            "inclination_rad": 0.043579752100344614,
-            "raan_rad": 2.5116887042921907,
-            "arg_periapsis_rad": 5.973830869870128,
-            "mean_anomaly_epoch_rad": 4.817175742568253
+            "semi_major_axis_m": 2415424587.5403075,
+            "eccentricity": 0.023440119840021367,
+            "inclination_rad": 0.04120550796740728,
+            "raan_rad": 5.239295970989456,
+            "arg_periapsis_rad": 2.6123997892404707,
+            "mean_anomaly_epoch_rad": 1.8348732412371784
           },
           "secular": {
-            "apsidal_rad_per_s": 6.583631639352256e-11,
-            "nodal_rad_per_s": -3.135062685405836e-11,
-            "migration_m_per_s": 4.118422710818198e-11
+            "apsidal_rad_per_s": 3.879104748878457e-11,
+            "nodal_rad_per_s": -1.84719273756117e-11,
+            "migration_m_per_s": 1.0880463263268396e-10
           },
           "tidally_locked": true,
-          "rotation_period_s": 6567327.333591665,
-          "doom_time_s": null
-        },
-        {
-          "mass_kg": 1.318689005122749e+23,
-          "radius_m": 2189328.045155174,
-          "orbit": {
-            "semi_major_axis_m": 8605433447.733385,
-            "eccentricity": 0.07279591756107791,
-            "inclination_rad": 0.023322252967999845,
-            "raan_rad": 6.006034654378181,
-            "arg_periapsis_rad": 0.9617750165184585,
-            "mean_anomaly_epoch_rad": 1.9211739129401961
-          },
-          "secular": {
-            "apsidal_rad_per_s": 2.6100635550920867e-10,
-            "nodal_rad_per_s": -1.242887407186708e-10,
-            "migration_m_per_s": 1.5231443202029435e-12
-          },
-          "tidally_locked": false,
-          "rotation_period_s": 76369.92291021247,
+          "rotation_period_s": 3869108.499356613,
           "doom_time_s": null
         }
       ],
@@ -495,96 +448,98 @@
         "migration_m_per_s": 0.0
       },
       "axial_tilt_rad": 0.3082880420021075,
-      "axial_precession_rad_per_s": 1.2361834289790984e-11,
+      "axial_precession_rad_per_s": 1.4157471086615114e-12,
       "rotation_period_s": 45120.66584906434,
-      "spin_drift_s_per_s": 5.890552754183204e-14,
-      "state": "Living",
+      "spin_drift_s_per_s": 1.6687085733679741e-15,
+      "state": {
+        "kind": "Living"
+      },
       "moons": [
         {
-          "mass_kg": 3.997619227382851e+23,
-          "radius_m": 3168573.9963678843,
+          "mass_kg": 1.1517149150497671e+23,
+          "radius_m": 2092722.8149480144,
           "orbit": {
-            "semi_major_axis_m": 669271874.3242896,
-            "eccentricity": 0.05535763527021974,
-            "inclination_rad": 0.01778321264668663,
-            "raan_rad": 5.5397102716651,
-            "arg_periapsis_rad": 3.4896321430449615,
-            "mean_anomaly_epoch_rad": 6.085426531705583
+            "semi_major_axis_m": 987244514.7993342,
+            "eccentricity": 0.04932786115840079,
+            "inclination_rad": 0.06227733967899721,
+            "raan_rad": 1.2415024490679072,
+            "arg_periapsis_rad": 5.5397102716651,
+            "mean_anomaly_epoch_rad": 3.4896321430449615
           },
           "secular": {
-            "apsidal_rad_per_s": 1.8224458904191657e-13,
-            "nodal_rad_per_s": -8.678313763900788e-14,
-            "migration_m_per_s": 1.4575602667328833e-6
+            "apsidal_rad_per_s": 3.2592209750834493e-13,
+            "nodal_rad_per_s": -1.5520099881349757e-13,
+            "migration_m_per_s": 4.950490533276556e-8
           },
           "tidally_locked": true,
-          "rotation_period_s": 190053.27450615476,
+          "rotation_period_s": 340493.3145266292,
           "doom_time_s": null
         },
         {
-          "mass_kg": 7.139908608166521e+23,
-          "radius_m": 3844391.3929243577,
+          "mass_kg": 7.18745626349831e+23,
+          "radius_m": 3852906.3258637716,
           "orbit": {
-            "semi_major_axis_m": 1598942849.7758615,
-            "eccentricity": 0.0065053986072809615,
-            "inclination_rad": 0.010206323712232774,
-            "raan_rad": 0.9592750889496329,
-            "arg_periapsis_rad": 3.9036784472193466,
-            "mean_anomaly_epoch_rad": 0.3300465613166467
+            "semi_major_axis_m": 2535762921.619429,
+            "eccentricity": 0.06297013875515954,
+            "inclination_rad": 0.007318573433191081,
+            "raan_rad": 0.7125358132113286,
+            "arg_periapsis_rad": 0.9592750889496329,
+            "mean_anomaly_epoch_rad": 3.9036784472193466
           },
           "secular": {
-            "apsidal_rad_per_s": 6.730483242678189e-13,
-            "nodal_rad_per_s": -3.204992020322947e-13,
-            "migration_m_per_s": 2.1639674857793666e-8
+            "apsidal_rad_per_s": 1.3442213713401197e-12,
+            "nodal_rad_per_s": -6.401054149238665e-13,
+            "migration_m_per_s": 1.7243162080135081e-9
           },
           "tidally_locked": true,
-          "rotation_period_s": 701812.1891424748,
+          "rotation_period_s": 1401633.489945747,
           "doom_time_s": null
         },
         {
-          "mass_kg": 2.464286960883899e+23,
-          "radius_m": 2696665.868543148,
+          "mass_kg": 6.906484231833008e+23,
+          "radius_m": 3802031.5831988086,
           "orbit": {
-            "semi_major_axis_m": 3801253055.8392444,
-            "eccentricity": 0.04599622686179064,
-            "inclination_rad": 0.08368386530159275,
-            "raan_rad": 0.3189991176453453,
-            "arg_periapsis_rad": 5.088673438522378,
-            "mean_anomaly_epoch_rad": 5.205593534720739
+            "semi_major_axis_m": 4190420602.920182,
+            "eccentricity": 0.03794842183298168,
+            "inclination_rad": 0.05174575521951447,
+            "raan_rad": 5.842235921232924,
+            "arg_periapsis_rad": 0.3189991176453453,
+            "mean_anomaly_epoch_rad": 5.088673438522378
           },
           "secular": {
-            "apsidal_rad_per_s": 2.458596003026641e-12,
-            "nodal_rad_per_s": -1.1707600014412576e-12,
-            "migration_m_per_s": 6.378715489727563e-11
+            "apsidal_rad_per_s": 2.8518336047264325e-12,
+            "nodal_rad_per_s": -1.3580160022506821e-12,
+            "migration_m_per_s": 1.0458740554262386e-10
           },
           "tidally_locked": true,
-          "rotation_period_s": 2572537.2284125495,
+          "rotation_period_s": 2977542.159830609,
           "doom_time_s": null
         },
         {
-          "mass_kg": 1.5364244678513032e+23,
-          "radius_m": 2303741.7002328997,
+          "mass_kg": 8.272132216988967e+22,
+          "radius_m": 1874142.1769608762,
           "orbit": {
-            "semi_major_axis_m": 6665158395.183339,
-            "eccentricity": 0.057457632867499726,
-            "inclination_rad": 0.0038004284433834357,
-            "raan_rad": 0.9174399652150117,
-            "arg_periapsis_rad": 2.464371865297543,
-            "mean_anomaly_epoch_rad": 5.295237463165836
+            "semi_major_axis_m": 10176419432.725077,
+            "eccentricity": 0.026835992780111388,
+            "inclination_rad": 0.06463983697593718,
+            "raan_rad": 0.2653199572939354,
+            "arg_periapsis_rad": 0.9174399652150117,
+            "mean_anomaly_epoch_rad": 2.464371865297543
           },
           "secular": {
-            "apsidal_rad_per_s": 5.728382794076159e-12,
-            "nodal_rad_per_s": -2.7278013305124565e-12,
-            "migration_m_per_s": 1.812144640484823e-12
+            "apsidal_rad_per_s": 1.0784599286389594e-11,
+            "nodal_rad_per_s": -5.1355234697093305e-12,
+            "migration_m_per_s": 9.51665291094473e-14
           },
-          "tidally_locked": true,
-          "rotation_period_s": 5972927.001657127,
+          "tidally_locked": false,
+          "rotation_period_s": 106859.646279371,
           "doom_time_s": null
         },
         {
           "mass_kg": 6.607337026451791e+22,
           "radius_m": 1738890.3549661657,
           "orbit": {
-            "semi_major_axis_m": 12369312759.831419,
+            "semi_major_axis_m": 18885569895.76843,
             "eccentricity": 0.07338500778847125,
             "inclination_rad": 0.04934967431332728,
             "raan_rad": 5.579766313289981,
@@ -592,9 +547,9 @@
             "mean_anomaly_epoch_rad": 3.1993606266429455
           },
           "secular": {
-            "apsidal_rad_per_s": 1.446467762777687e-11,
-            "nodal_rad_per_s": -6.887941727512795e-12,
-            "migration_m_per_s": 2.598753428472459e-14
+            "apsidal_rad_per_s": 2.7288869524997615e-11,
+            "nodal_rad_per_s": -1.2994699773808388e-11,
+            "migration_m_per_s": 2.534837911727419e-15
           },
           "tidally_locked": false,
           "rotation_period_s": 52466.58573227947,
@@ -604,7 +559,7 @@
           "mass_kg": 8.310110072321517e+22,
           "radius_m": 1877005.8986431912,
           "orbit": {
-            "semi_major_axis_m": 23814190082.749996,
+            "semi_major_axis_m": 36359704055.62127,
             "eccentricity": 0.0644679302910991,
             "inclination_rad": 0.07123843329454214,
             "raan_rad": 2.054362036280506,
@@ -612,9 +567,9 @@
             "mean_anomaly_epoch_rad": 3.1217533665322743
           },
           "secular": {
-            "apsidal_rad_per_s": 3.8589596944056896e-11,
-            "nodal_rad_per_s": -1.8375998544788996e-11,
-            "migration_m_per_s": 8.905310049497443e-16
+            "apsidal_rad_per_s": 7.28026232680351e-11,
+            "nodal_rad_per_s": -3.4667915841921475e-11,
+            "migration_m_per_s": 8.686286771893546e-17
           },
           "tidally_locked": false,
           "rotation_period_s": 91635.41384319594,
