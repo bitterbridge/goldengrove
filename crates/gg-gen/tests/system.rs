@@ -74,3 +74,12 @@ fn anchor_planets_are_in_the_hz_across_stellar_types() {
             "seed {seed}: anchor at {} AU, HZ [{}, {}]", a / AU, inner / AU, outer / AU);
     }
 }
+
+#[test]
+fn u64_max_seed_survives_json_roundtrip() {
+    let desc = generate(u64::MAX);
+    let json = serde_json::to_string(&desc).unwrap();
+    assert!(json.contains("\"18446744073709551615\""), "seed must serialize as string");
+    let back: SystemDescriptor = serde_json::from_str(&json).unwrap();
+    assert_eq!(desc, back);
+}

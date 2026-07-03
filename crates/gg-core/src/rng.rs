@@ -39,25 +39,31 @@ impl RngStream {
     }
 
     pub fn uniform(&mut self, lo: f64, hi: f64) -> f64 {
+        debug_assert!(lo <= hi, "uniform: lo {lo} > hi {hi}");
         lo + (hi - lo) * self.rng.gen::<f64>()
     }
 
     pub fn log_uniform(&mut self, lo: f64, hi: f64) -> f64 {
+        debug_assert!(0.0 < lo && lo <= hi, "log_uniform: need 0 < lo <= hi, got [{lo}, {hi}]");
         math::exp(self.uniform(math::ln(lo), math::ln(hi)))
     }
 
     /// Sample p(x) ∝ x^(-alpha) on [lo, hi] by inverse CDF. Requires alpha != 1.
     pub fn power_law(&mut self, alpha: f64, lo: f64, hi: f64) -> f64 {
+        debug_assert!(alpha != 1.0, "power_law: alpha == 1 divides by zero");
+        debug_assert!(0.0 < lo && lo <= hi, "power_law: need 0 < lo <= hi, got [{lo}, {hi}]");
         let u = self.rng.gen::<f64>();
         let k = 1.0 - alpha;
         math::powf(math::powf(lo, k) * (1.0 - u) + math::powf(hi, k) * u, 1.0 / k)
     }
 
     pub fn chance(&mut self, p: f64) -> bool {
+        debug_assert!((0.0..=1.0).contains(&p), "chance: p {p} outside [0, 1]");
         self.rng.gen::<f64>() < p
     }
 
     pub fn pick_count(&mut self, lo: usize, hi: usize) -> usize {
+        debug_assert!(lo <= hi, "pick_count: lo {lo} > hi {hi}");
         // Width-independent: sample a full u64 so 32-bit (wasm32) and 64-bit
         // targets consume the stream identically. Modulo bias is ~span/2^64 —
         // irrelevant for the tiny spans we draw (and determinism is what matters).

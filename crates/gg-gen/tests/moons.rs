@@ -121,3 +121,59 @@ fn doomed_moons_get_a_doom_date() {
     let doom = doom.expect("inward migration must produce a doom date");
     assert!(doom > 0.0);
 }
+
+#[test]
+fn inward_spiraling_moon_dooms_a_living_world() {
+    // A very slowly rotating planet puts moons below synchronous orbit ->
+    // inward migration. Across seeds, at least one anchor-like planet must
+    // get doomed through the generate_moons wiring, with state matching the
+    // soonest moon doom.
+    use gg_core::orbit::orbital_period_s;
+    let mut wired = 0;
+    for seed in 0..300u64 {
+        let mut rng = RngStream::root(seed).child("moons-doom-test");
+        let mut p = earth_like();
+        p.mass_kg = 2.5 * M_EARTH; // maximize moon probability
+        p.radius_m = R_EARTH * 2.5f64.powf(0.27);
+        p.rotation_period_s = 2000.0 * 3600.0; // slower than any moon orbit
+        let period = orbital_period_s(AU, G * M_SUN);
+        generate_moons(&mut rng, &mut p, period, &sunlike_ctx());
+        let soonest = p.moons.iter().filter_map(|m| m.doom_time_s).fold(f64::INFINITY, f64::min);
+        if soonest < 1e8 * 3.156e7 {
+            wired += 1;
+            match p.state {
+                WorldState::Doomed { doom_time_s } => assert_eq!(doom_time_s, soonest, "seed {seed}"),
+                other => panic!("seed {seed}: moon doom at {soonest} but state {other:?}"),
+            }
+        }
+        for m in &p.moons {
+            assert!(m.secular.migration_m_per_s < 0.0, "seed {seed}: slow rotator must migrate moons inward");
+        }
+    }
+    assert!(wired >= 3, "expected several doomed cases across 300 seeds, got {wired}");
+}
+
+#[test]
+fn giant_planets_get_major_moon_families() {
+    let mut with_moons = 0;
+    for seed in 0..200u64 {
+        let mut rng = RngStream::root(seed).child("giant-moons-test");
+        let mut p = earth_like();
+        p.class = PlanetClass::GasGiant;
+        p.mass_kg = 300.0 * M_EARTH;
+        p.radius_m = 11.0 * R_EARTH;
+        p.orbit.semi_major_axis_m = 5.0 * AU;
+        p.rotation_period_s = 10.0 * 3600.0;
+        let period = gg_core::orbit::orbital_period_s(5.0 * AU, G * M_SUN);
+        generate_moons(&mut rng, &mut p, period, &sunlike_ctx());
+        if !p.moons.is_empty() {
+            with_moons += 1;
+        }
+        assert!(p.moons.len() <= 6, "seed {seed}");
+        for m in &p.moons {
+            let frac = m.mass_kg / p.mass_kg;
+            assert!((1e-5..=3e-4).contains(&frac), "seed {seed}: giant moon mass fraction {frac}");
+        }
+    }
+    assert!(with_moons > 150, "giants should almost always have moons, got {with_moons}/200");
+}

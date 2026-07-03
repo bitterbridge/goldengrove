@@ -18,6 +18,7 @@ pub fn orbital_period_s(semi_major_axis_m: f64, mu: f64) -> f64 {
 
 /// Solve Kepler's equation M = E - e·sin(E) for eccentric anomaly E (Newton).
 pub fn solve_kepler(mean_anomaly_rad: f64, e: f64) -> f64 {
+    debug_assert!((0.0..1.0).contains(&e), "eccentricity {e} outside [0, 1)");
     let m = mean_anomaly_rad.rem_euclid(TAU);
     let mut big_e = if e > 0.8 { PI } else { m };
     for _ in 0..16 {
@@ -34,6 +35,7 @@ pub fn solve_kepler(mean_anomaly_rad: f64, e: f64) -> f64 {
 
 /// Position relative to the focus (parent body) at time t, meters.
 pub fn position_at(el: &OrbitalElements, mu: f64, t_s: f64) -> [f64; 3] {
+    debug_assert!((0.0..1.0).contains(&el.eccentricity), "eccentricity {} outside [0, 1)", el.eccentricity);
     let n = TAU / orbital_period_s(el.semi_major_axis_m, mu);
     let m = el.mean_anomaly_epoch_rad + n * t_s;
     let big_e = solve_kepler(m, el.eccentricity);

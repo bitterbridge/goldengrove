@@ -162,3 +162,26 @@ fn world_states_are_mostly_living_sometimes_not() {
     assert!(living > 700, "living = {living}");
     assert!(dead > 20 && doomed > 20, "dead = {dead}, doomed = {doomed}");
 }
+
+#[test]
+fn old_stars_doom_by_star_death() {
+    // Remaining main-sequence life < 2 Gyr forces the star-death doom branch:
+    // doom_time_s must equal the star's exact remaining lifetime.
+    let lifetime = 10e9 * 3.156e7;
+    let ctx = StellarContext {
+        age_s: 0.95 * lifetime,
+        primary_ms_lifetime_s: lifetime,
+        ..sunlike_ctx()
+    };
+    let remaining = ctx.primary_ms_lifetime_s - ctx.age_s;
+    let mut doomed_seen = 0;
+    for seed in 0..300u64 {
+        let mut rng = RngStream::root(seed).child("planets");
+        let (planets, anchor) = generate_planets(&mut rng, &ctx);
+        if let WorldState::Doomed { doom_time_s } = planets[anchor].state {
+            doomed_seen += 1;
+            assert!((doom_time_s - remaining).abs() < 1.0, "seed {seed}: doom {doom_time_s} != star remaining {remaining}");
+        }
+    }
+    assert!(doomed_seen >= 10, "8% of 300 should be doomed, saw {doomed_seen}");
+}

@@ -327,3 +327,26 @@ fn secular_extrapolation_stays_physical() {
         "rotation reversed across the drift cap boundary: before={before}, after={after}, diff={signed_diff}"
     );
 }
+
+#[test]
+fn rotation_never_reverses_in_deep_time() {
+    // Regression for the uncapped quadratic spin-drift term, whose reversal
+    // onset was t = p0/drift. Probe far beyond it.
+    let mut desc = single_planet_system();
+    let p0 = 86_164.0;
+    let drift = 5.0e-9;
+    desc.planets[0].rotation_period_s = p0;
+    desc.planets[0].spin_drift_s_per_s = drift;
+    let eph = KeplerSecular::new(desc);
+    let t_reversal_old = p0 / drift; // ~1.7e13 s
+    for &t in &[2.0 * t_reversal_old, 10.0 * t_reversal_old, 1.0e18] {
+        let dt = p0 / 4.0;
+        let r0 = eph.states_at(t)[1].rotation_rad;
+        let r1 = eph.states_at(t + dt)[1].rotation_rad;
+        let advance = (r1 - r0).rem_euclid(std::f64::consts::TAU);
+        assert!(
+            advance > 0.0 && advance < std::f64::consts::PI,
+            "t={t}: rotation went backwards or stalled (advance {advance})"
+        );
+    }
+}
