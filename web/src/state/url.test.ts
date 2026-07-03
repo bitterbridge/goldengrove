@@ -21,6 +21,9 @@ describe('parseAppState', () => {
     const s = parseAppState('#seed=1&t=-5&speed=0&body=-2&lat=999&lon=abc&view=sideways')!;
     expect(s).toEqual(defaultAppState('1'));
   });
+  it('treats empty param values as absent, not zero', () => {
+    expect(parseAppState('#seed=1&lat=&lon=&body=&t=&speed=')).toEqual(defaultAppState('1'));
+  });
 });
 
 describe('serializeAppState', () => {

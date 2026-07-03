@@ -16,13 +16,14 @@ export function defaultAppState(seed: string): AppState {
 }
 
 function finiteInRange(v: string | null, lo: number, hi: number): number | null {
-  if (v === null) return null;
+  if (v === null || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) && n >= lo && n <= hi ? n : null;
 }
 
 /** Tolerant parse: a valid seed is required; every other field falls back to
- * its default rather than failing — a mangled link still opens the world. */
+ * its default rather than failing — a mangled link still opens the world.
+ * Note: range bounds below are deliberately conservative practical limits, not formal contracts. */
 export function parseAppState(hash: string): AppState | null {
   const params = new URLSearchParams(hash.replace(/^#/, ''));
   const seed = parseSeedValue(params.get('seed') ?? '');
