@@ -35,4 +35,11 @@ describe('parseDescriptor', () => {
     delete d.planets[0].orbit;
     expect(() => parseDescriptor(JSON.stringify(d))).toThrow(/planets\[0\]\.orbit/);
   });
+
+  it('rejects Barycenter host with fewer than 2 stars', () => {
+    const d = JSON.parse(goldenJson);
+    d.planet_host = 'Barycenter';
+    d.stars = [d.stars[0]];
+    expect(() => parseDescriptor(JSON.stringify(d))).toThrow(/planet_host/);
+  });
 });

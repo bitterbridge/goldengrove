@@ -12,7 +12,7 @@
     "three": "^0.166.0"
   },
   "devDependencies": {
-    "@types/node": "^26.1.0",
+    "@types/node": "^22.0.0",
     "@types/three": "^0.166.0",
     "happy-dom": "^15.0.0",
     "typescript": "~5.5.0",

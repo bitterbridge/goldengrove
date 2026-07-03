@@ -53,7 +53,7 @@ export function buildSpaceScene(sim: Sim): SpaceView {
       material = new THREE.MeshBasicMaterial({ color: new THREE.Color(r, g, b) });
       const light = new THREE.PointLight(new THREE.Color(r, g, b), 3, 0, 0.15);
       scene.add(light); // repositioned in update() via the mesh (see below)
-      (light as THREE.PointLight & { __followsBody?: number }).__followsBody = i;
+      light.userData.followsBody = i;
     } else {
       const palette = { Rocky: 0x9b8f7a, IceGiant: 0x7ec8e3, GasGiant: 0xd8b27a } as const;
       const color = ref.kind === 'planet' ? palette[sim.descriptor.planets[ref.planet]!.class] : 0x8a8f98;
@@ -91,7 +91,7 @@ export function buildSpaceScene(sim: Sim): SpaceView {
         new THREE.LineBasicMaterial({ color: 0x2a3a5a, transparent: true, opacity: 0.7 }),
       );
       line.name = `orbit-${i}`;
-      (line as THREE.LineLoop & { __rawPath?: Float64Array }).__rawPath = path;
+      line.userData.rawPath = path;
       orbitGroup.add(line);
       m.orbitLine = line;
     }
@@ -101,7 +101,7 @@ export function buildSpaceScene(sim: Sim): SpaceView {
   function writeOrbitLine(m: BodyMeta, trueScale: boolean): void {
     const line = m.orbitLine;
     if (!line) return;
-    const raw = (line as THREE.LineLoop & { __rawPath?: Float64Array }).__rawPath!;
+    const raw = line.userData.rawPath as Float64Array;
     const attr = (line.geometry as THREE.BufferGeometry).getAttribute('position') as THREE.BufferAttribute;
     for (let k = 0; k < raw.length / 3; k++) {
       let x: number, y: number, z: number;
@@ -166,7 +166,7 @@ export function buildSpaceScene(sim: Sim): SpaceView {
     });
     // star lights follow their star
     scene.traverse((o) => {
-      const follows = (o as THREE.PointLight & { __followsBody?: number }).__followsBody;
+      const follows = o.userData.followsBody as number | undefined;
       if (follows !== undefined) o.position.copy(bodies[follows]!.position);
     });
   }

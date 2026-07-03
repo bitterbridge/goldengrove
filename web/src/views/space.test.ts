@@ -168,7 +168,7 @@ describe('buildSpaceScene', () => {
     // star point-light follows its star mesh
     let lightChecked = false;
     view.scene.traverse((o) => {
-      const follows = (o as THREE.PointLight & { __followsBody?: number }).__followsBody;
+      const follows = o.userData.followsBody as number | undefined;
       if (follows !== undefined) {
         expect(o.position.distanceTo(view.bodies[follows]!.position)).toBeLessThan(1e-9);
         lightChecked = true;
@@ -183,6 +183,18 @@ describe('buildSpaceScene', () => {
       const moonLine = lines.children.find((c) => c.name === `orbit-${moonIdx}`)!;
       const parentIdx = parentIndex(layout, golden, moonIdx)!;
       expect(moonLine.position.distanceTo(view.bodies[parentIdx]!.position)).toBeLessThan(1e-9);
+    }
+
+    // moon orbit-line VERTICES also rescale on flips (previously unprobed)
+    const moonIdx2 = layout.findIndex((r) => r.kind === 'moon');
+    if (moonIdx2 >= 0) {
+      const moonOrbitLine = lines.children.find((c) => c.name === `orbit-${moonIdx2}`)! as THREE.LineLoop;
+      const mAttr = (moonOrbitLine.geometry as THREE.BufferGeometry).getAttribute('position');
+      const compressedMX = mAttr.getX(1);
+      view.update(states, true, originM);
+      expect(mAttr.getX(1)).not.toBeCloseTo(compressedMX, 6);
+      view.update(states, false, originM);
+      expect(mAttr.getX(1)).toBeCloseTo(compressedMX, 6);
     }
   });
 
@@ -234,7 +246,7 @@ describe('buildSpaceScene', () => {
     // host-relative); the line object itself rides originView.
     const lines = view.scene.getObjectByName('orbit-lines')!;
     const firstLine = lines.children[0] as THREE.LineLoop;
-    const raw = (firstLine as THREE.LineLoop & { __rawPath?: Float64Array }).__rawPath!;
+    const raw = firstLine.userData.rawPath as Float64Array;
     const attr = (firstLine.geometry as THREE.BufferGeometry).getAttribute('position');
 
     expect(firstLine.position.x).toBeCloseTo(originView[0], 4);

@@ -47,7 +47,7 @@ async function boot(): Promise<void> {
   labelRenderer.domElement.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
   app.append(renderer.domElement, labelRenderer.domElement);
 
-  const camera = new THREE.PerspectiveCamera(50, 1, 0.001, 5000);
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.001, 20000);
   camera.position.set(0, -28, 16);
   camera.up.set(0, 0, 1); // +Z is system north (sim frame convention)
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -93,7 +93,6 @@ async function boot(): Promise<void> {
       -(e.clientY / renderer.domElement.clientHeight) * 2 + 1,
     );
     const ray = new THREE.Raycaster();
-    ray.params.Line = { threshold: 0.05 };
     ray.setFromCamera(ndc, camera);
     const hit = ray.intersectObjects(view.bodies, false)[0];
     focused = hit ? view.bodyIndexOf(hit.object) : focused;

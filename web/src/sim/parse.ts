@@ -48,6 +48,10 @@ export function parseDescriptor(json: string): SystemDescriptor {
     if (o.orbit !== null && o.orbit !== undefined) orbit(o.orbit, `stars[${i}].orbit`);
   });
 
+  if (d.planet_host === 'Barycenter' && (d.stars as unknown[]).length < 2) {
+    fail('$.planet_host', 'Barycenter requires at least 2 stars');
+  }
+
   const planets = arr(d.planets, '$.planets');
   if (planets.length === 0) fail('$.planets', 'empty');
   planets.forEach((p, i) => {
