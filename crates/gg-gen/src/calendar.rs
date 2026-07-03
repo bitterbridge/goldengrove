@@ -16,13 +16,14 @@ pub fn solar_day_s(sidereal_day_s: f64, year_s: f64) -> f64 {
 
 /// Derive a leap rule from the fractional year via signed greedy
 /// continued-fraction convergents (up to 3 correction terms).
+/// Corrections stop once residual drift is below 1e-4 days/year (under one day per 10,000 years — calendar-invisible).
 /// 365.2422 → base 365, +1 every 4 years, -1 every 128 years.
 pub fn leap_rule(year_solar_days: f64) -> LeapRule {
     let base_days = year_solar_days.floor() as u32;
     let mut r = year_solar_days.fract();
     let mut terms = Vec::new();
     for _ in 0..3 {
-        if r.abs() < 1e-6 {
+        if r.abs() < 1e-4 {
             break;
         }
         let every_years = (1.0 / r.abs()).round().max(1.0) as u32;
