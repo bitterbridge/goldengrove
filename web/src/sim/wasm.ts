@@ -13,10 +13,17 @@ export interface Sim {
 
 let wasmReady: Promise<unknown> | null = null;
 
+export class WasmLoadError extends Error {}
+
 /** Boot the WASM module (once) and build a world from a seed string. */
 export async function loadSim(seed: string): Promise<Sim> {
   wasmReady ??= init(new URL('../wasm/pkg/gg_wasm_bg.wasm', import.meta.url));
-  await wasmReady;
+  try {
+    await wasmReady;
+  } catch (err) {
+    wasmReady = null; // allow retry on next call rather than caching the failure
+    throw new WasmLoadError(`WASM module failed to load: ${String(err)}`);
+  }
   const world = new World(seed);
   const descriptor = parseDescriptor(world.descriptor_json());
   return {

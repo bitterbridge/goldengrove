@@ -20,15 +20,15 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      - name: wasm32 golden parity (canonical determinism target)
-        run: wasm-pack test --node crates/gg-wasm
-      - name: Build WASM package
-        run: wasm-pack build crates/gg-wasm --target web --out-dir ../../web/src/wasm/pkg
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - name: wasm32 golden parity (canonical determinism target)
+        run: wasm-pack test --node crates/gg-wasm
+      - name: Build WASM package
+        run: wasm-pack build crates/gg-wasm --target web --out-dir ../../web/src/wasm/pkg
       - name: Web tests + build
         working-directory: web
         run: |

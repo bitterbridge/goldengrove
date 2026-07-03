@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
-import { loadSim, type Sim } from './sim/wasm';
+import { loadSim, WasmLoadError, type Sim } from './sim/wasm';
 import { SimClock } from './time/clock';
 import { buildSpaceScene, type SpaceView } from './views/space';
 import { buildHud, formatDate } from './ui/hud';
@@ -9,6 +9,10 @@ import { parseSeedFromHash, randomSeed } from './ui/seed';
 import './styles.css';
 
 const app = document.getElementById('app')!;
+
+// Full reload on seed change: tearing down renderer/loop/listeners by hand
+// buys nothing at this app size and invites leaks.
+addEventListener('hashchange', () => location.reload());
 
 async function boot(): Promise<void> {
   const seed = parseSeedFromHash(location.hash) ?? randomSeed();
@@ -21,7 +25,18 @@ async function boot(): Promise<void> {
   } catch (err) {
     const card = document.createElement('div');
     card.className = 'hud hud-top-left';
-    card.textContent = `This seed found a bug — please report it. (${String(err)})`;
+    card.textContent =
+      err instanceof WasmLoadError
+        ? 'Goldengrove failed to load its simulation engine — check your connection and reload.'
+        : `This seed found a bug — please report it. (${String(err)})`;
+    if (!(err instanceof WasmLoadError)) {
+      const reroll = document.createElement('button');
+      reroll.textContent = '⟲ try another world';
+      reroll.addEventListener('click', () => {
+        location.hash = `seed=${randomSeed()}`;
+      });
+      card.append(document.createElement('br'), reroll);
+    }
     app.append(card);
     return;
   }
@@ -86,9 +101,6 @@ async function boot(): Promise<void> {
   addEventListener('keydown', (e) => {
     if (e.key === 'Escape') focused = null;
   });
-  // Full reload on seed change: tearing down renderer/loop/listeners by hand
-  // buys nothing at this app size and invites leaks.
-  addEventListener('hashchange', () => location.reload());
 
   let lastWall = performance.now();
   let lastDateUpdate = 0;
