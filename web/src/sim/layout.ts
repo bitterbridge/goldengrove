@@ -36,3 +36,26 @@ export function bodyName(desc: SystemDescriptor, index: number): string {
       return `${ROMAN[ref.planet] ?? `P${ref.planet + 1}`}${String.fromCharCode(97 + ref.moon)}`;
   }
 }
+
+export function bodyRadiusM(desc: SystemDescriptor, ref: BodyRef): number {
+  switch (ref.kind) {
+    case 'star': return desc.stars[ref.star]!.radius_m;
+    case 'planet': return desc.planets[ref.planet]!.radius_m;
+    case 'moon': return desc.planets[ref.planet]!.moons[ref.moon]!.radius_m;
+  }
+}
+
+/** You can stand on rocky planets and any moon; giants have no surface. */
+export function standableBody(desc: SystemDescriptor, ref: BodyRef): boolean {
+  if (ref.kind === 'moon') return true;
+  return ref.kind === 'planet' && desc.planets[ref.planet]!.class === 'Rocky';
+}
+
+/** Sky-shader density. Dead worlds lost their air; moons never had much. */
+export function atmosphereDensityFor(desc: SystemDescriptor, ref: BodyRef): number {
+  if (ref.kind === 'moon') return 0.05;
+  if (ref.kind === 'planet' && desc.planets[ref.planet]!.class === 'Rocky') {
+    return desc.planets[ref.planet]!.state.kind === 'Dead' ? 0.05 : 1.0;
+  }
+  return 1.0;
+}

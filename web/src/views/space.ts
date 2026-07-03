@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { bodyLayout, bodyName, parentIndex, type BodyRef } from '../sim/layout';
+import { bodyLayout, bodyName, bodyRadiusM, parentIndex, type BodyRef } from '../sim/layout';
 import type { Sim } from '../sim/wasm';
 import { compressPosition, displayRadius, moonViewFactor } from './compression';
 import { temperatureToColor } from './color';
@@ -22,14 +22,6 @@ interface BodyMeta {
   parent: number | null;
   moonFactor: number; // view units per meter of moon-orbit offset (moons only)
   orbitLine: THREE.LineLoop | null;
-}
-
-function bodyRadiusM(sim: Sim, ref: BodyRef): number {
-  switch (ref.kind) {
-    case 'star': return sim.descriptor.stars[ref.star]!.radius_m;
-    case 'planet': return sim.descriptor.planets[ref.planet]!.radius_m;
-    case 'moon': return sim.descriptor.planets[ref.planet]!.moons[ref.moon]!.radius_m;
-  }
 }
 
 export function buildSpaceScene(sim: Sim): SpaceView {
@@ -76,7 +68,7 @@ export function buildSpaceScene(sim: Sim): SpaceView {
     const moonA = ref.kind === 'moon' ? sim.descriptor.planets[ref.planet]!.moons[ref.moon]!.orbit.semi_major_axis_m : 0;
     const m: BodyMeta = {
       ref,
-      radiusM: bodyRadiusM(sim, ref),
+      radiusM: bodyRadiusM(sim.descriptor, ref),
       parent,
       moonFactor: ref.kind === 'moon' ? moonViewFactor(moonA, false) : 0,
       orbitLine: null,
