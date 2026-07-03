@@ -63,6 +63,8 @@ jobs:
         uses: taiki-e/install-action@c93ccc03e00cd0e08e494f5fd058a6c55a6a1907 # v2
         with:
           tool: wasm-pack
+      - name: Build WASM package
+        run: wasm-pack build crates/gg-wasm --target web --out-dir ../../web/src/wasm/pkg
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
