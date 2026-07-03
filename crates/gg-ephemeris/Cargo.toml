@@ -2,3 +2,7 @@
 name = "gg-ephemeris"
 version = "0.1.0"
 edition = "2021"
+
+[dependencies]
+gg-core = { path = "../gg-core" }
+gg-gen = { path = "../gg-gen" }
