@@ -60,6 +60,10 @@ async function boot(): Promise<void> {
   const clock = new SimClock();
   clock.t = state.t;
   clock.speed = state.speed;
+  if (state.t > 0) {
+    // A shared moment should hold until the viewer presses play.
+    clock.paused = true;
+  }
   let trueScale = false;
   let focused: number | null = null;
   if (state.body !== null && state.body < sim.bodyCount) focused = state.body;
@@ -89,6 +93,7 @@ async function boot(): Promise<void> {
     },
   });
   hud.setActiveSpeed(clock.speed);
+  hud.setPaused(clock.paused);
 
   function resize(): void {
     const { clientWidth: w, clientHeight: h } = app;
