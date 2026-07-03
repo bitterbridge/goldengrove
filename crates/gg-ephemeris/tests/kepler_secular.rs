@@ -262,3 +262,68 @@ fn body_order_contract_with_multiple_planets_and_moons() {
     let r3 = mag(states[planet_index(&desc, 2)].position_m);
     assert!(r1 < r2 && r2 < r3);
 }
+
+#[test]
+fn secular_extrapolation_stays_physical() {
+    // 1. An inward-migrating moon evaluated at extreme t must not extrapolate
+    //    past the +/-50% freeze — a naive linear drift would put it inside
+    //    (or through) its planet's center.
+    let mut desc = single_planet_system();
+    let epoch_a = 3.844e8;
+    desc.planets[0].moons.push(Moon {
+        mass_kg: 7.3e22,
+        radius_m: 1.7e6,
+        orbit: circular(epoch_a),
+        secular: SecularRates { migration_m_per_s: -1.0, ..SecularRates::default() },
+        tidally_locked: true,
+        rotation_period_s: 2.36e6,
+        doom_time_s: None,
+    });
+    let eph = KeplerSecular::new(desc.clone());
+    let states = eph.states_at(1.0e18);
+    let planet_pos = states[planet_index(&desc, 0)].position_m;
+    let moon_pos = states[moon_index(&desc, 0, 0)].position_m;
+    let d = [
+        moon_pos[0] - planet_pos[0],
+        moon_pos[1] - planet_pos[1],
+        moon_pos[2] - planet_pos[2],
+    ];
+    assert!(
+        mag(d) >= 0.5 * epoch_a - 1.0,
+        "moon migrated past its +/-50% validity horizon: {} < {}",
+        mag(d),
+        0.5 * epoch_a
+    );
+
+    // 2. A planet with aggressive spin-drift evaluated at very large times
+    //    must always produce a finite rotation angle.
+    let mut desc2 = single_planet_system();
+    desc2.planets[0].spin_drift_s_per_s = 5e-9;
+    let eph2 = KeplerSecular::new(desc2.clone());
+    for &t in &[1.0e10, 1.0e12, 1.0e15, 1.0e18, 1.0e20] {
+        let rot = eph2.states_at(t)[planet_index(&desc2, 0)].rotation_rad;
+        assert!(rot.is_finite(), "rotation_rad not finite at t={t}: {rot}");
+    }
+
+    // 3. Rotation must keep advancing (not reverse) across the cap boundary.
+    // Pick period/drift so the cap t_cap = 0.5*p0/drift sits many periods
+    // out, but the probe delta around it stays far smaller than one period
+    // (no 2*pi wraparound between the two samples).
+    let mut desc3 = single_planet_system();
+    let period_s = 1000.0;
+    let drift = 1e-4;
+    desc3.planets[0].rotation_period_s = period_s;
+    desc3.planets[0].spin_drift_s_per_s = drift;
+    let eph3 = KeplerSecular::new(desc3.clone());
+    let t_cap = 0.5 * period_s / drift;
+    let delta = period_s * 1e-4; // << period_s, so no full-turn wraparound
+    let before = eph3.states_at(t_cap - delta)[planet_index(&desc3, 0)].rotation_rad;
+    let after = eph3.states_at(t_cap + delta)[planet_index(&desc3, 0)].rotation_rad;
+    // wrap-safe signed angular difference
+    let signed_diff = (after - before + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU)
+        - std::f64::consts::PI;
+    assert!(
+        signed_diff > 0.0,
+        "rotation reversed across the drift cap boundary: before={before}, after={after}, diff={signed_diff}"
+    );
+}

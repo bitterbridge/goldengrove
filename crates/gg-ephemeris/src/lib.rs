@@ -38,7 +38,12 @@ fn elements_at(el: &OrbitalElements, sec: &gg_gen::descriptor::SecularRates, t_s
     let mut e = *el;
     e.arg_periapsis_rad += sec.apsidal_rad_per_s * t_s;
     e.raan_rad += sec.nodal_rad_per_s * t_s;
-    e.semi_major_axis_m = (e.semi_major_axis_m + sec.migration_m_per_s * t_s).max(1.0);
+    // Linear drift is only meaningful for modest fractional change; freeze at
+    // +/-50% of the epoch value so deep-time extrapolation can't produce
+    // absurd orbits (e.g. a moon 1 m from its planet's center).
+    let da = sec.migration_m_per_s * t_s;
+    let max_da = 0.5 * el.semi_major_axis_m;
+    e.semi_major_axis_m = el.semi_major_axis_m + da.clamp(-max_da, max_da);
     e
 }
 
@@ -57,7 +62,14 @@ fn spin_axis(tilt_rad: f64, precession_rad_per_s: f64, t_s: f64) -> [f64; 3] {
 /// Rotation angle with linear spin-drift (day slowly lengthens):
 /// θ(t) = 2π (t/p0 − drift·t²/(2·p0²)).
 fn rotation_rad(period_s: f64, drift_s_per_s: f64, t_s: f64) -> f64 {
-    (TAU * (t_s / period_s - drift_s_per_s * t_s * t_s / (2.0 * period_s * period_s)))
+    // The quadratic term is a linearization; cap its time argument at
+    // 0.5*p0/drift so d(theta)/dt stays positive (rotation never reverses).
+    let t_drift = if drift_s_per_s > 0.0 {
+        t_s.min(0.5 * period_s / drift_s_per_s)
+    } else {
+        t_s
+    };
+    (TAU * (t_s / period_s - drift_s_per_s * t_drift * t_drift / (2.0 * period_s * period_s)))
         .rem_euclid(TAU)
 }
 
