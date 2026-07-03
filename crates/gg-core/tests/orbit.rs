@@ -25,8 +25,6 @@ fn earth_like_period_is_one_year() {
 #[test]
 fn kepler_solver_matches_equation() {
     for &(m, e) in &[(0.5, 0.1), (3.0, 0.6), (5.5, 0.9), (0.0, 0.0)] {
-        let m = m as f64;
-        let e = e as f64;
         let big_e = solve_kepler(m, e);
         let recovered = big_e - e * big_e.sin();
         let expected = m.rem_euclid(std::f64::consts::TAU);

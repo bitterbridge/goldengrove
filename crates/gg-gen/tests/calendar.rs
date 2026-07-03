@@ -5,7 +5,7 @@ use gg_gen::descriptor::*;
 
 #[test]
 fn earth_solar_day_from_sidereal() {
-    let d = solar_day_s(86_164.0905, YEAR);
+    let d = solar_day_s(86_164.090_5, YEAR);
     assert!((d - 86_400.0).abs() < 5.0, "solar day {d}");
 }
 
@@ -95,7 +95,7 @@ fn lunar_synodic_month_is_29_and_a_half_days() {
         secular: SecularRates::default(),
         axial_tilt_rad: 0.41,
         axial_precession_rad_per_s: 0.0,
-        rotation_period_s: 86_164.0905,
+        rotation_period_s: 86_164.090_5,
         spin_drift_s_per_s: 0.0,
         state: WorldState::Living,
         moons: vec![moon],

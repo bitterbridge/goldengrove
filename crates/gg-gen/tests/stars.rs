@@ -54,7 +54,7 @@ fn close_binary_means_circumbinary_planets() {
     for seed in 0..500u64 {
         let mut rng = RngStream::root(seed).child("stars");
         let out = generate_stars(&mut rng);
-        let has_close_pair = out.stars.get(1).map_or(false, |c| {
+        let has_close_pair = out.stars.get(1).is_some_and(|c| {
             c.orbit.unwrap().semi_major_axis_m < 1.0 * AU
         });
         if has_close_pair {

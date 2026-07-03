@@ -8,4 +8,7 @@ gg-core = { path = "../gg-core" }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
-serde_json = "1"
+# float_roundtrip: typed (de)serialization otherwise uses an approximate
+# float parser that can be off by 1 ULP; only serde_json::Value parsing is
+# exact by default. We need bit-exact roundtrips for golden-file pinning.
+serde_json = { version = "1", features = ["float_roundtrip"] }
