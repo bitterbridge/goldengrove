@@ -52,3 +52,48 @@ fn seed_string_worlds_are_deterministic() {
     let b = gg_gen::generate(42);
     assert_eq!(a, b);
 }
+
+#[test]
+fn orbit_paths_agree_with_ephemeris_at_t_zero() {
+    // The path's first sample is position_at(elements, mu, 0). If our
+    // host-mass mirror drifted from gg-ephemeris's convention, mu — and any
+    // secular-free position derived from it — would disagree with the
+    // ephemeris ground truth. Compare planet world-positions at t=0.
+    use gg_gen::descriptor::PlanetHost;
+    let mut checked_barycenter = false;
+    for seed in 0..80u64 {
+        let desc = gg_gen::generate(seed);
+        let is_barycenter = desc.planet_host == PlanetHost::Barycenter;
+        let stars = desc.stars.len();
+        let eph = KeplerSecular::new(desc);
+        let states = eph.states_at(0.0);
+        // host origin: mass-weighted close-pair barycenter (Barycenter) or primary (Primary)
+        let d = eph.desc();
+        let origin = match d.planet_host {
+            PlanetHost::Barycenter => {
+                let (m0, m1) = (d.stars[0].mass_kg, d.stars[1].mass_kg);
+                let (p0, p1) = (states[0].position_m, states[1].position_m);
+                [
+                    (m0 * p0[0] + m1 * p1[0]) / (m0 + m1),
+                    (m0 * p0[1] + m1 * p1[1]) / (m0 + m1),
+                    (m0 * p0[2] + m1 * p1[2]) / (m0 + m1),
+                ]
+            }
+            PlanetHost::Primary => states[0].position_m,
+        };
+        for (pi, _) in d.planets.iter().enumerate() {
+            let path = orbit_path_points(d, stars + pi, 8);
+            let expect = states[stars + pi].position_m;
+            for k in 0..3 {
+                let got = origin[k] + path[k];
+                assert!(
+                    (got - expect[k]).abs() < 1.0,
+                    "seed {seed} planet {pi} axis {k}: path+origin {got} vs ephemeris {}",
+                    expect[k]
+                );
+            }
+        }
+        checked_barycenter |= is_barycenter;
+    }
+    assert!(checked_barycenter, "no circumbinary system in seed range — widen it");
+}

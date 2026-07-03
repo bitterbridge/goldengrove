@@ -1983,7 +1983,7 @@ jobs:
         run: wasm-pack build crates/gg-wasm --target web --out-dir ../../web/src/wasm/pkg
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Web tests + build
