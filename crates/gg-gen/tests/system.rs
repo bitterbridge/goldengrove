@@ -56,6 +56,13 @@ fn golden_seeds_are_pinned() {
 }
 
 #[test]
+fn schema_version_is_2_after_libm_migration() {
+    assert_eq!(SCHEMA_VERSION, 2);
+    let desc = generate(42);
+    assert_eq!(desc.schema_version, 2);
+}
+
+#[test]
 fn anchor_planets_are_in_the_hz_across_stellar_types() {
     use gg_gen::planets::habitable_zone_m;
     for seed in 0..500u64 {

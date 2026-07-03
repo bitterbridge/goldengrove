@@ -1,3 +1,4 @@
+use crate::math;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
 
@@ -42,14 +43,14 @@ impl RngStream {
     }
 
     pub fn log_uniform(&mut self, lo: f64, hi: f64) -> f64 {
-        self.uniform(lo.ln(), hi.ln()).exp()
+        math::exp(self.uniform(math::ln(lo), math::ln(hi)))
     }
 
     /// Sample p(x) ∝ x^(-alpha) on [lo, hi] by inverse CDF. Requires alpha != 1.
     pub fn power_law(&mut self, alpha: f64, lo: f64, hi: f64) -> f64 {
         let u = self.rng.gen::<f64>();
         let k = 1.0 - alpha;
-        (lo.powf(k) * (1.0 - u) + hi.powf(k) * u).powf(1.0 / k)
+        math::powf(math::powf(lo, k) * (1.0 - u) + math::powf(hi, k) * u, 1.0 / k)
     }
 
     pub fn chance(&mut self, p: f64) -> bool {

@@ -1,5 +1,6 @@
 use crate::descriptor::{Planet, PlanetClass, SecularRates, WorldState};
 use gg_core::consts::*;
+use gg_core::math;
 use gg_core::orbit::{orbital_period_s, OrbitalElements};
 use gg_core::rng::RngStream;
 use std::f64::consts::TAU;
@@ -38,7 +39,7 @@ pub fn gr_apsidal_rate(host_mass_kg: f64, orbit: &OrbitalElements) -> f64 {
 
 fn rocky_radius(mass_kg: f64) -> f64 {
     // Terrestrial mass-radius power law, Earth-calibrated.
-    R_EARTH * (mass_kg / M_EARTH).powf(0.27)
+    R_EARTH * math::powf(mass_kg / M_EARTH, 0.27)
 }
 
 fn class_beyond_frost(rng: &mut RngStream) -> PlanetClass {
@@ -70,7 +71,7 @@ fn sample_planet(rng: &mut RngStream, a_m: f64, frost_m: f64, ctx: &StellarConte
         PlanetClass::IceGiant => {
             let m = rng.log_uniform(6.0, 30.0) * M_EARTH;
             // Neptune-calibrated: 17 M_E -> ~3.9 R_E
-            (m, R_EARTH * (m / M_EARTH).powf(0.5), rng.log_uniform(9.0, 20.0) * 3600.0)
+            (m, R_EARTH * math::powf(m / M_EARTH, 0.5), rng.log_uniform(9.0, 20.0) * 3600.0)
         }
         PlanetClass::GasGiant => {
             let m = rng.log_uniform(40.0, 2500.0) * M_EARTH;
@@ -193,7 +194,7 @@ pub fn generate_planets(rng: &mut RngStream, ctx: &StellarContext) -> (Vec<Plane
 ///
 /// Closed-form derivation (replaces the old iterative *=1.1 / /=1.1 loops,
 /// which could spin forever): requiring (a2 - a1) >= 8 * rh with
-/// rh = k*(a1+a2)/2 and k = ((m1+m2)/(3*m_star)).cbrt() rearranges to
+/// rh = k*(a1+a2)/2 and k = cbrt((m1+m2)/(3*m_star)) rearranges to
 /// a2 >= a1 * (1 + 4k) / (1 - 4k), valid only while 4k < 1. As k approaches
 /// 0.25 this bound diverges — for k >= 0.25 no finite separation satisfies
 /// the >= 8 mutual-Hill criterion at all, so the old loop would run forever.
@@ -211,7 +212,7 @@ fn enforce_hill_spacing(planets: &mut Vec<Planet>, m_star: f64, anchor: usize) -
     let mut i = anchor;
     while i + 1 < planets.len() {
         let a1 = planets[i].orbit.semi_major_axis_m;
-        let k = ((planets[i].mass_kg + planets[i + 1].mass_kg) / (3.0 * m_star)).cbrt();
+        let k = math::cbrt((planets[i].mass_kg + planets[i + 1].mass_kg) / (3.0 * m_star));
         if 4.0 * k >= 0.95 {
             planets.remove(i + 1);
             // anchor index unaffected (removal is strictly after it); recheck
@@ -232,7 +233,7 @@ fn enforce_hill_spacing(planets: &mut Vec<Planet>, m_star: f64, anchor: usize) -
     let mut i = anchor;
     while i > 0 {
         let a2 = planets[i].orbit.semi_major_axis_m;
-        let k = ((planets[i - 1].mass_kg + planets[i].mass_kg) / (3.0 * m_star)).cbrt();
+        let k = math::cbrt((planets[i - 1].mass_kg + planets[i].mass_kg) / (3.0 * m_star));
         if 4.0 * k >= 0.95 {
             planets.remove(i - 1);
             anchor -= 1;

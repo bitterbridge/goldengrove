@@ -1,12 +1,12 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "seed": "123456789",
   "age_s": 7.1051001508061784e+16,
   "stars": [
     {
       "mass_kg": 2.2399316557768857e+30,
       "radius_m": 744464428.3033822,
-      "luminosity_w": 6.158029133898099e+26,
+      "luminosity_w": 6.1580291338980996e+26,
       "temperature_k": 6283.951160239945,
       "main_sequence_lifetime_s": 2.344732824120492e+17,
       "orbit": null
@@ -74,8 +74,8 @@
         "migration_m_per_s": 0.0
       },
       "axial_tilt_rad": 0.2356118598643212,
-      "axial_precession_rad_per_s": 4.8328906469110874e-11,
-      "rotation_period_s": 129785.45029907947,
+      "axial_precession_rad_per_s": 4.832890646911088e-11,
+      "rotation_period_s": 129785.45029907943,
       "spin_drift_s_per_s": 0.0,
       "state": {
         "kind": "Living"
@@ -128,8 +128,8 @@
         "migration_m_per_s": 0.0
       },
       "axial_tilt_rad": 0.5575956999336672,
-      "axial_precession_rad_per_s": 2.1655532819459585e-12,
-      "rotation_period_s": 74456.4272571615,
+      "axial_precession_rad_per_s": 2.165553281945957e-12,
+      "rotation_period_s": 74456.42725716154,
       "spin_drift_s_per_s": 0.0,
       "state": {
         "kind": "Living"
@@ -205,8 +205,8 @@
       },
       "axial_tilt_rad": 0.0036960292059054043,
       "axial_precession_rad_per_s": 7.672360663635206e-11,
-      "rotation_period_s": 79874.02656555663,
-      "spin_drift_s_per_s": 8.624613535015464e-10,
+      "rotation_period_s": 79874.02656555662,
+      "spin_drift_s_per_s": 8.624613535015463e-10,
       "state": {
         "kind": "Living"
       },
@@ -280,8 +280,8 @@
           "doom_time_s": null
         },
         {
-          "mass_kg": 3.885763233129963e+22,
-          "radius_m": 1456874.550568598,
+          "mass_kg": 3.8857632331299625e+22,
+          "radius_m": 1456874.5505685979,
           "orbit": {
             "semi_major_axis_m": 1684714517.5049112,
             "eccentricity": 0.009001103146539987,
@@ -293,7 +293,7 @@
           "secular": {
             "apsidal_rad_per_s": 6.263731624375642e-11,
             "nodal_rad_per_s": -2.982729344940782e-11,
-            "migration_m_per_s": 1.1345114360937579e-9
+            "migration_m_per_s": 1.1345114360937577e-9
           },
           "tidally_locked": true,
           "rotation_period_s": 926382.9349328025,
@@ -432,7 +432,7 @@
     },
     {
       "class": "GasGiant",
-      "mass_kg": 4.9092033644420096e+27,
+      "mass_kg": 4.90920336444201e+27,
       "radius_m": 67661656.66141255,
       "orbit": {
         "semi_major_axis_m": 3393368885024.371,
@@ -448,16 +448,16 @@
         "migration_m_per_s": 0.0
       },
       "axial_tilt_rad": 0.3082880420021075,
-      "axial_precession_rad_per_s": 1.4157471086615114e-12,
+      "axial_precession_rad_per_s": 1.4157471086615116e-12,
       "rotation_period_s": 45120.66584906434,
-      "spin_drift_s_per_s": 1.6687085733679741e-15,
+      "spin_drift_s_per_s": 1.6687085733679745e-15,
       "state": {
         "kind": "Living"
       },
       "moons": [
         {
-          "mass_kg": 1.1517149150497671e+23,
-          "radius_m": 2092722.8149480144,
+          "mass_kg": 1.1517149150497673e+23,
+          "radius_m": 2092722.8149480147,
           "orbit": {
             "semi_major_axis_m": 987244514.7993342,
             "eccentricity": 0.04932786115840079,
@@ -476,8 +476,8 @@
           "doom_time_s": null
         },
         {
-          "mass_kg": 7.18745626349831e+23,
-          "radius_m": 3852906.3258637716,
+          "mass_kg": 7.187456263498312e+23,
+          "radius_m": 3852906.325863772,
           "orbit": {
             "semi_major_axis_m": 2535762921.619429,
             "eccentricity": 0.06297013875515954,
@@ -496,7 +496,7 @@
           "doom_time_s": null
         },
         {
-          "mass_kg": 6.906484231833008e+23,
+          "mass_kg": 6.90648423183301e+23,
           "radius_m": 3802031.5831988086,
           "orbit": {
             "semi_major_axis_m": 4190420602.920182,
@@ -516,8 +516,8 @@
           "doom_time_s": null
         },
         {
-          "mass_kg": 8.272132216988967e+22,
-          "radius_m": 1874142.1769608762,
+          "mass_kg": 8.272132216988969e+22,
+          "radius_m": 1874142.1769608764,
           "orbit": {
             "semi_major_axis_m": 10176419432.725077,
             "eccentricity": 0.026835992780111388,
@@ -536,7 +536,7 @@
           "doom_time_s": null
         },
         {
-          "mass_kg": 6.607337026451791e+22,
+          "mass_kg": 6.6073370264517915e+22,
           "radius_m": 1738890.3549661657,
           "orbit": {
             "semi_major_axis_m": 18885569895.76843,

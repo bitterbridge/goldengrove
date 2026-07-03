@@ -1,7 +1,8 @@
 use gg_core::orbit::OrbitalElements;
 use serde::{Deserialize, Serialize};
 
-pub const SCHEMA_VERSION: u32 = 1;
+/// v2: generation math moved to libm (wasm32-canonical determinism).
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// u64 <-> JSON string: JS Numbers lose precision above 2^53.
 mod seed_string {

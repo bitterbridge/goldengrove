@@ -1,6 +1,7 @@
 use crate::descriptor::{Moon, Planet, PlanetClass, SecularRates, WorldState};
 use crate::planets::StellarContext;
 use gg_core::consts::*;
+use gg_core::math;
 use gg_core::orbit::{orbital_period_s, OrbitalElements};
 use gg_core::rng::RngStream;
 use std::f64::consts::TAU;
@@ -13,11 +14,11 @@ const DYN_ELLIPTICITY_EARTH: f64 = 0.00327;
 const SIDEREAL_DAY_EARTH: f64 = 86_164.0;
 
 pub fn hill_radius_m(a_m: f64, m_planet: f64, m_star: f64) -> f64 {
-    a_m * (m_planet / (3.0 * m_star)).cbrt()
+    a_m * math::cbrt(m_planet / (3.0 * m_star))
 }
 
 pub fn roche_limit_m(planet_radius_m: f64, planet_density: f64, moon_density: f64) -> f64 {
-    2.44 * planet_radius_m * (planet_density / moon_density).cbrt()
+    2.44 * planet_radius_m * math::cbrt(planet_density / moon_density)
 }
 
 fn density(mass_kg: f64, radius_m: f64) -> f64 {
@@ -42,7 +43,7 @@ pub fn moon_physics(
 
     // Nodal regression from stellar torque: Ω̇ = -(3/4)(n_p²/n_m)cos(i).
     // Reproduces the Moon's 18.6-year cycle.
-    let nodal = -0.75 * n_planet * n_planet / n_moon * orbit.inclination_rad.cos();
+    let nodal = -0.75 * n_planet * n_planet / n_moon * math::cos(orbit.inclination_rad);
     // Apsidal advance ≈ 2.1x the nodal magnitude (lunar 8.85 yr vs 18.6 yr).
     let apsidal = 2.1 * nodal.abs();
 
@@ -80,7 +81,7 @@ pub fn moon_physics(
     // term is expressed relative to the solar torque.
     let moon_factor = (moon_mass_kg * (planet.orbit.semi_major_axis_m / a).powi(3))
         / (planet_host_mass(n_planet, planet.orbit.semi_major_axis_m));
-    let solar_rate = 1.5 * h * n_planet * n_planet / spin * planet.axial_tilt_rad.cos().abs();
+    let solar_rate = 1.5 * h * n_planet * n_planet / spin * math::cos(planet.axial_tilt_rad).abs();
     if planet.axial_precession_rad_per_s == 0.0 {
         planet.axial_precession_rad_per_s = solar_rate; // solar term, seeded once
     }
@@ -122,7 +123,7 @@ pub fn generate_moons(
     let n_planet = TAU / planet_orbit_period_s;
     let h = DYN_ELLIPTICITY_EARTH * (SIDEREAL_DAY_EARTH / planet.rotation_period_s).powi(2);
     planet.axial_precession_rad_per_s =
-        1.5 * h * n_planet * n_planet / spin * planet.axial_tilt_rad.cos().abs();
+        1.5 * h * n_planet * n_planet / spin * math::cos(planet.axial_tilt_rad).abs();
 
     let count = match planet.class {
         PlanetClass::Rocky => {
@@ -171,7 +172,7 @@ pub fn generate_moons(
         } else {
             rng.log_uniform(6.0, 40.0) * 3600.0
         };
-        let radius = (3.0 * moon_mass / (4.0 * std::f64::consts::PI * MOON_DENSITY)).cbrt();
+        let radius = math::cbrt(3.0 * moon_mass / (4.0 * std::f64::consts::PI * MOON_DENSITY));
         planet.moons.push(Moon {
             mass_kg: moon_mass,
             radius_m: radius,

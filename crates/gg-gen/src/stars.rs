@@ -1,5 +1,6 @@
 use crate::descriptor::{PlanetHost, Star};
 use gg_core::consts::*;
+use gg_core::math;
 use gg_core::orbit::OrbitalElements;
 use gg_core::rng::RngStream;
 use std::f64::consts::TAU;
@@ -14,29 +15,29 @@ pub struct StarsOutput {
 pub fn luminosity_w(mass_kg: f64) -> f64 {
     let m = mass_kg / M_SUN;
     let l = if m < 0.43 {
-        0.23 * m.powf(2.3)
+        0.23 * math::powf(m, 2.3)
     } else if m < 2.0 {
-        m.powf(4.0)
+        math::powf(m, 4.0)
     } else {
-        1.4 * m.powf(3.5)
+        1.4 * math::powf(m, 3.5)
     };
     l * L_SUN
 }
 
 pub fn radius_m(mass_kg: f64) -> f64 {
     let m = mass_kg / M_SUN;
-    let r = if m < 1.0 { m.powf(0.8) } else { m.powf(0.57) };
+    let r = if m < 1.0 { math::powf(m, 0.8) } else { math::powf(m, 0.57) };
     r * R_SUN
 }
 
 /// Effective temperature from Stefan-Boltzmann, relative to the Sun.
 pub fn temperature_k(luminosity_w: f64, radius_m: f64) -> f64 {
-    T_SUN * ((luminosity_w / L_SUN) / (radius_m / R_SUN).powi(2)).powf(0.25)
+    T_SUN * math::powf((luminosity_w / L_SUN) / (radius_m / R_SUN).powi(2), 0.25)
 }
 
 /// Main-sequence lifetime ~ 10 Gyr · (M/M_sun)^-2.5.
 pub fn ms_lifetime_s(mass_kg: f64) -> f64 {
-    10e9 * YEAR_APPROX * (mass_kg / M_SUN).powf(-2.5)
+    10e9 * YEAR_APPROX * math::powf(mass_kg / M_SUN, -2.5)
 }
 
 fn make_star(mass_kg: f64, orbit: Option<OrbitalElements>) -> Star {
