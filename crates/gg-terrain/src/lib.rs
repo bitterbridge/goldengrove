@@ -186,3 +186,102 @@ fn draw_ocean_target(rng: &mut RngStream, facts: &BodyFacts) -> f64 {
         rng.uniform(0.20, 0.85)
     }
 }
+
+pub struct TerrainSpec {
+    raw: RawTerrain,
+    sea_level: f64,
+    ocean_fraction: f64,
+    relief_m: f64,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TerrainInfo {
+    pub sea_level: f64,
+    pub ocean_fraction: f64,
+    pub relief_m: f64,
+    pub plate_count: usize,
+}
+
+impl TerrainSpec {
+    pub fn for_body(seed: u64, desc: &SystemDescriptor, body_index: usize) -> Option<TerrainSpec> {
+        let facts = body_facts(desc, body_index)?;
+        let mut rng = RngStream::root(seed).child(&format!("terrain-{body_index}"));
+        let ocean_target = draw_ocean_target(&mut rng, &facts);
+        let land_bias = rng.uniform(0.25, 0.6);
+        let relief_m = rng.uniform(3000.0, 12_000.0) * (facts.radius_m / R_EARTH).clamp(0.3, 1.2);
+        let raw = RawTerrain::build(&mut rng, &facts, land_bias, seed, body_index);
+
+        // Solve sea level by bisection on a cos-lat-weighted sample grid so
+        // the weighted underwater fraction hits the target.
+        let (gw, gh) = (128usize, 64usize); // same grid the ocean-fraction test measures on
+        let mut samples = Vec::with_capacity(gw * gh);
+        for row in 0..gh {
+            let lat = 90.0 - (row as f64 + 0.5) * 180.0 / gh as f64;
+            let weight = math::cos(lat.to_radians());
+            for col in 0..gw {
+                let lon = -180.0 + (col as f64 + 0.5) * 360.0 / gw as f64;
+                samples.push((raw.raw_elevation(latlon_to_unit(lat, lon)), weight));
+            }
+        }
+        let total_w: f64 = samples.iter().map(|(_, w)| w).sum();
+        let frac_below = |s: f64| -> f64 {
+            samples.iter().filter(|(e, _)| *e < s).map(|(_, w)| w).sum::<f64>() / total_w
+        };
+        let (mut lo, mut hi) = (-6.0f64, 6.0f64);
+        for _ in 0..48 {
+            let mid = 0.5 * (lo + hi);
+            if frac_below(mid) < ocean_target {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        let sea_level = 0.5 * (lo + hi);
+        let ocean_fraction = frac_below(sea_level);
+
+        Some(TerrainSpec { raw, sea_level, ocean_fraction, relief_m })
+    }
+
+    /// Elevation relative to sea level (0 = shore), relative units;
+    /// `info().relief_m` gives the meters-per-unit scale.
+    pub fn elevation(&self, lat_deg: f64, lon_deg: f64) -> f64 {
+        self.raw.raw_elevation(latlon_to_unit(lat_deg, lon_deg)) - self.sea_level
+    }
+
+    /// Equirect heightmap: row-major, row 0 = lat +90, col 0 = lon -180,
+    /// sample centers at pixel centers.
+    pub fn heightmap(&self, width: usize, height: usize) -> Vec<f32> {
+        let mut out = Vec::with_capacity(width * height);
+        for row in 0..height {
+            let lat = 90.0 - (row as f64 + 0.5) * 180.0 / height as f64;
+            for col in 0..width {
+                let lon = -180.0 + (col as f64 + 0.5) * 360.0 / width as f64;
+                out.push(self.elevation(lat, lon) as f32);
+            }
+        }
+        out
+    }
+
+    pub fn info(&self) -> TerrainInfo {
+        TerrainInfo {
+            sea_level: self.sea_level,
+            ocean_fraction: self.ocean_fraction,
+            relief_m: self.relief_m,
+            plate_count: self.raw.plates.plates.len(),
+        }
+    }
+}
+
+/// FNV-1a-64 over the little-endian bytes of the i16 quantization —
+/// the terrain determinism fingerprint.
+pub fn heightmap_hash(map: &[f32]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for e in map {
+        let q = ((f64::from(*e).clamp(-4.0, 4.0) / 4.0) * 32767.0) as i16;
+        for b in q.to_le_bytes() {
+            h ^= u64::from(b);
+            h = h.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    h
+}
