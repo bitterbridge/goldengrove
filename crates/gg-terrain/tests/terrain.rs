@@ -247,3 +247,43 @@ fn elevation_fine_batch_matches_scalar() {
         assert_eq!(batch[i], spec.elevation_fine(pair[0], pair[1]) as f32);
     }
 }
+
+/// 64x32 fine-elevation grid, same pixel-center sampling as heightmap().
+fn fine_grid(spec: &TerrainSpec) -> Vec<f32> {
+    let (w, h) = (64usize, 32usize);
+    let mut out = Vec::with_capacity(w * h);
+    for row in 0..h {
+        let lat = 90.0 - (row as f64 + 0.5) * 180.0 / h as f64;
+        for col in 0..w {
+            let lon = -180.0 + (col as f64 + 0.5) * 360.0 / w as f64;
+            out.push(spec.elevation_fine(lat, lon) as f32);
+        }
+    }
+    out
+}
+
+#[test]
+fn golden_fine_hashes_are_pinned() {
+    for seed in [1u64, 42, 123_456_789] {
+        let path = format!("tests/golden/terrain-fine-seed-{seed}.json");
+        let expected = std::fs::read_to_string(&path).unwrap_or_else(|_| {
+            panic!("missing {path}; bootstrap: cargo run -p gg-terrain --example fine_hashes -- {seed} > crates/gg-terrain/{path}")
+        });
+        let expected: std::collections::BTreeMap<String, String> =
+            serde_json::from_str(&expected).unwrap();
+        let desc = generate(seed);
+        let total = desc.stars.len()
+            + desc.planets.len()
+            + desc.planets.iter().map(|p| p.moons.len()).sum::<usize>();
+        let mut actual = std::collections::BTreeMap::new();
+        for body in 0..total {
+            if let Some(spec) = TerrainSpec::for_body(seed, &desc, body) {
+                actual.insert(
+                    format!("body_{body}"),
+                    format!("{:#018x}", gg_terrain::fine_hash(&fine_grid(&spec))),
+                );
+            }
+        }
+        assert_eq!(actual, expected, "seed {seed}: fine elevation diverged — ground terrain would change under walkers' feet");
+    }
+}

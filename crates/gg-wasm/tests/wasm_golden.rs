@@ -53,6 +53,22 @@ fn world_boundary_marshals_correctly() {
     assert!(origin.to_vec().iter().all(|v| v.is_finite()));
 }
 
+/// 64x32 fine-elevation grid, same pixel-center sampling as heightmap()
+/// (mirrors gg-terrain's tests/terrain.rs; wasm tests can't import test
+/// helpers from another crate's test binary).
+fn fine_grid(spec: &gg_terrain::TerrainSpec) -> Vec<f32> {
+    let (w, h) = (64usize, 32usize);
+    let mut out = Vec::with_capacity(w * h);
+    for row in 0..h {
+        let lat = 90.0 - (row as f64 + 0.5) * 180.0 / h as f64;
+        for col in 0..w {
+            let lon = -180.0 + (col as f64 + 0.5) * 360.0 / w as f64;
+            out.push(spec.elevation_fine(lat, lon) as f32);
+        }
+    }
+    out
+}
+
 #[wasm_bindgen_test]
 fn junk_seeds_error_cleanly() {
     for bad in ["banana", "", "-5", "0x2a", "18446744073709551616"] {
@@ -115,4 +131,42 @@ fn terrain_hashes_match_native_goldens_on_wasm32() {
         32,
         "cached second call identical"
     );
+}
+
+#[wasm_bindgen_test]
+fn fine_hashes_match_native_goldens_on_wasm32() {
+    for (seed, golden) in [
+        (
+            1u64,
+            include_str!("../../gg-terrain/tests/golden/terrain-fine-seed-1.json"),
+        ),
+        (
+            42,
+            include_str!("../../gg-terrain/tests/golden/terrain-fine-seed-42.json"),
+        ),
+        (
+            123_456_789,
+            include_str!("../../gg-terrain/tests/golden/terrain-fine-seed-123456789.json"),
+        ),
+    ] {
+        let expected: std::collections::BTreeMap<String, String> =
+            serde_json::from_str(golden).unwrap();
+        let desc = gg_gen::generate(seed);
+        let total = desc.stars.len()
+            + desc.planets.len()
+            + desc.planets.iter().map(|p| p.moons.len()).sum::<usize>();
+        let mut actual = std::collections::BTreeMap::new();
+        for body in 0..total {
+            if let Some(spec) = gg_terrain::TerrainSpec::for_body(seed, &desc, body) {
+                actual.insert(
+                    format!("body_{body}"),
+                    format!("{:#018x}", gg_terrain::fine_hash(&fine_grid(&spec))),
+                );
+            }
+        }
+        assert_eq!(
+            actual, expected,
+            "seed {seed}: wasm32 fine elevation diverged from native"
+        );
+    }
 }
