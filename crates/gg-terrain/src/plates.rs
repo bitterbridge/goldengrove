@@ -60,6 +60,25 @@ impl Plates {
         (a, b)
     }
 
+    /// Index and dot product of the third-nearest plate seed (excluding the
+    /// given nearest and second-nearest indices). Used to detect proximity to
+    /// triple junctions, where the second/third-nearest ranking is ambiguous.
+    pub fn third_nearest(&self, p: V3, a: usize, b: usize) -> (usize, f64) {
+        let mut c = 0usize;
+        let mut dc = f64::NEG_INFINITY;
+        for (i, pl) in self.plates.iter().enumerate() {
+            if i == a || i == b {
+                continue;
+            }
+            let d = dot(p, pl.seed_point);
+            if d > dc {
+                dc = d;
+                c = i;
+            }
+        }
+        (c, dc)
+    }
+
     /// Surface velocity of plate `i` at point `p`: rate · (pole × p).
     pub fn velocity(&self, i: usize, p: V3) -> V3 {
         scale(cross(self.plates[i].euler_pole, p), self.plates[i].rate)

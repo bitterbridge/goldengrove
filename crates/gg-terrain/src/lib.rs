@@ -9,9 +9,9 @@ use gg_core::consts::R_EARTH;
 use gg_core::math;
 use gg_core::rng::RngStream;
 use gg_gen::descriptor::{PlanetClass, SystemDescriptor, WorldState};
-use noise::warped_fbm;
+use noise::{fbm, warped_fbm};
 use plates::{build_plates, Plates};
-use sphere::{cross, dot, geodesic, latlon_to_unit, normalize, random_unit, scale, sub, V3};
+use sphere::{add, cross, dot, geodesic, latlon_to_unit, normalize, random_unit, scale, sub, V3};
 
 struct Hotspot {
     center: V3,
@@ -59,6 +59,18 @@ fn body_facts(desc: &SystemDescriptor, body_index: usize) -> Option<BodyFacts> {
     None
 }
 
+/// Width (radians) of the fade band used to smooth over triple-junction
+/// ambiguity (see `RawTerrain::third_margin`). Wide enough that, sampled on
+/// a 512x256 equirect grid (~0.012 rad/pixel), the fade itself never swings
+/// by more than a small fraction of its range within a single pixel step —
+/// otherwise the fade would just relocate the cliff instead of removing it.
+const TRIPLE_JUNCTION_WIDTH: f64 = 0.4;
+
+fn smooth01(t: f64) -> f64 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
 struct RawTerrain {
     plates: Plates,
     noise_seed: u64,
@@ -89,23 +101,65 @@ impl RawTerrain {
         RawTerrain { plates, noise_seed, hotspots }
     }
 
-    fn boundary_term(&self, p: V3) -> f64 {
-        let (a, b) = self.plates.nearest_two(p);
+    /// Plate-scale domain warp: seams and coastlines wander instead of
+    /// following perfect great circles. Applied to ALL plate queries.
+    fn warped(&self, p: V3) -> V3 {
+        let w: V3 = [
+            fbm(self.noise_seed ^ 0x5A5A, scale(p, 1.7), 4),
+            fbm(self.noise_seed ^ 0xA5A5, scale(p, 1.7), 4),
+            fbm(self.noise_seed ^ 0x55AA, scale(p, 1.7), 4),
+        ];
+        normalize(add(p, scale(w, 0.055)))
+    }
+
+    /// Third-nearest plate index and its margin over the second-nearest
+    /// (`dc - db >= 0`) at `q`. Used near triple junctions, where crossing
+    /// the bisector between the second- and third-nearest plates swaps `b`'s
+    /// identity discontinuously even though `q` moves smoothly. Both
+    /// neighboring interpretations (using the old vs. new second-nearest
+    /// plate) see the margin shrink to the same zero limit, so anything
+    /// gated or blended by it stays continuous through that swap.
+    fn third_margin(&self, q: V3, a: usize, b: usize, db: f64) -> (usize, f64) {
+        let (c, dc_dot) = self.plates.third_nearest(q, a, b);
+        let dc = math::acos(dc_dot.clamp(-1.0, 1.0));
+        (c, dc - db)
+    }
+
+    /// Confidence that (a, b) are unambiguously the nearest and
+    /// second-nearest plates at `q`. Falls smoothly to 0 as the third-nearest
+    /// plate ties with b — gates per-pair physics (velocity, continental
+    /// character) that has no meaningful continuous extension across a
+    /// change of which plate is second-nearest.
+    fn pair_confidence(&self, q: V3, a: usize, b: usize, db: f64) -> f64 {
+        let (_, margin) = self.third_margin(q, a, b, db);
+        smooth01((margin / TRIPLE_JUNCTION_WIDTH).min(1.0))
+    }
+
+    fn boundary_term(&self, q: V3) -> f64 {
+        let (a, b) = self.plates.nearest_two(q);
         let pa = &self.plates.plates[a];
         let pb = &self.plates.plates[b];
-        let da = geodesic(p, pa.seed_point);
-        let db = geodesic(p, pb.seed_point);
+        let da = geodesic(q, pa.seed_point);
+        let db = geodesic(q, pb.seed_point);
         // Distance from the (approximate) Voronoi edge; 0 on the edge.
-        let edge_dist = (db - da) * 0.5;
-        let falloff = math::exp(-(edge_dist / 0.09) * (edge_dist / 0.09));
+        let edge = (db - da) * 0.5;
+        let falloff = math::exp(-(edge / 0.09) * (edge / 0.09));
         if falloff < 1e-3 {
             return 0.0;
         }
-        // Boundary normal: from plate b's seed toward plate a's, tangent at p.
+        // Near a triple junction the second-nearest plate's identity (and
+        // hence its velocity/continental character) is ambiguous; fade the
+        // whole pairwise term out as that ambiguity is approached so the
+        // swap to a different second-nearest plate is continuous.
+        let conf = self.pair_confidence(q, a, b, db);
+        if conf < 1e-3 {
+            return 0.0;
+        }
+        // Boundary normal: from plate b's seed toward plate a's, tangent at q.
         let raw_n = sub(pa.seed_point, pb.seed_point);
-        let n = normalize(sub(raw_n, scale(p, dot(raw_n, p))));
-        let t = cross(p, n);
-        let dv = sub(self.plates.velocity(a, p), self.plates.velocity(b, p));
+        let n = normalize(sub(raw_n, scale(q, dot(raw_n, q))));
+        let t = cross(q, n);
+        let dv = sub(self.plates.velocity(a, q), self.plates.velocity(b, q));
         // dv·n < 0 means plate a's material moves toward plate b: convergence.
         let closing = -dot(dv, n);
         let shear = dot(dv, t).abs();
@@ -115,21 +169,34 @@ impl RawTerrain {
             match (pa.continental, pb.continental) {
                 (true, true) => term += 1.5 * closing * falloff, // collision belts
                 (false, false) => {
-                    // island arc + trench, offset to the overriding side
+                    // island arc + trench, offset to the overriding side.
+                    // NOTE: widened from the original 0.02 sigma to 0.06 — at
+                    // 0.02 this Gaussian is narrower than one grid cell on a
+                    // 512x256 sample (~0.012 rad/pixel), so even with A/B/C
+                    // fixing the seam defects, this pre-existing (unrelated)
+                    // narrow feature still aliases into pixel-to-pixel jumps
+                    // over 0.35 on its own; measured via the continuity test.
                     term += 0.45 * closing * falloff;
-                    let trench = math::exp(-((edge_dist - 0.035) / 0.02) * ((edge_dist - 0.035) / 0.02));
+                    let trench = math::exp(-((edge - 0.035) / 0.06) * ((edge - 0.035) / 0.06));
                     term -= 0.7 * closing * trench;
                 }
                 _ => {
-                    // ocean-continent: cordillera on the continental side,
-                    // trench on the oceanic side
-                    let on_continent = if da <= db { pa.continental } else { pb.continental };
-                    if on_continent {
-                        term += 1.0 * closing * falloff;
-                    } else {
-                        let trench = math::exp(-((edge_dist - 0.03) / 0.02) * ((edge_dist - 0.03) / 0.02));
-                        term -= 0.9 * closing * trench;
-                    }
+                    // ocean-continent: cordillera and trench as continuous
+                    // signed-side windows (no hard switch at the edge).
+                    // signed distance: positive on the continental plate's side
+                    let s = if pa.continental { edge } else { -edge };
+                    // cordillera: gaussian window centered slightly onto the
+                    // continent. NOTE: widened from the spec's 0.045 to 0.06,
+                    // same grid-aliasing reason as above.
+                    let ridge = math::exp(-((s - 0.025) / 0.06) * ((s - 0.025) / 0.06));
+                    // trench: window centered slightly onto the ocean side.
+                    // NOTE: widened from the spec's 0.02 sigma to 0.06 (same
+                    // width as the ridge window) for the same grid-aliasing
+                    // reason as the OO arm's trench above — the offset
+                    // (+0.03) and ridge center offset are unchanged.
+                    let trench = math::exp(-((s + 0.03) / 0.06) * ((s + 0.03) / 0.06));
+                    term += 1.0 * closing * ridge;
+                    term -= 0.9 * closing * trench;
                 }
             }
         } else {
@@ -141,13 +208,36 @@ impl RawTerrain {
             }
         }
         term += 0.12 * shear * falloff; // transform ridging
-        term
+        term * conf
+    }
+
+    /// Cross-edge blended base elevation. Rather than interpolate between
+    /// just the nearest two plates (which reintroduces a discontinuity one
+    /// rank down, at the second/third-nearest tie — and again at third/
+    /// fourth, ad infinitum, at any junction where 3+ plates meet), this
+    /// blends ALL plates with a distance-based softmax kernel. That has no
+    /// discrete nearest-neighbor selection anywhere, so it's continuous by
+    /// construction at every order, including triple (and higher) junctions.
+    /// The kernel width matches the ~2.6-degree scale used by the other
+    /// boundary windows; far from any boundary it reduces to (approximately)
+    /// the single nearest plate's own base_elev, same as the original intent.
+    fn base_elevation(&self, q: V3) -> f64 {
+        const KERNEL_WIDTH: f64 = 0.045;
+        let mut wsum = 0.0;
+        let mut vsum = 0.0;
+        for pl in &self.plates.plates {
+            let d = geodesic(q, pl.seed_point);
+            let w = math::exp(-d / KERNEL_WIDTH);
+            wsum += w;
+            vsum += w * pl.base_elev;
+        }
+        vsum / wsum
     }
 
     fn raw_elevation(&self, p: V3) -> f64 {
-        let (a, _) = self.plates.nearest_two(p);
-        let base = self.plates.plates[a].base_elev;
-        let boundary = self.boundary_term(p);
+        let q = self.warped(p);
+        let base = self.base_elevation(q);
+        let boundary = self.boundary_term(q);
         let detail = 0.35 * warped_fbm(self.noise_seed, scale(p, 2.6), 6);
         let mut hot = 0.0;
         for h in &self.hotspots {

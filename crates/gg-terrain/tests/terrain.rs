@@ -114,6 +114,33 @@ fn moons_have_terrain_and_all_terrain_is_deterministic() {
 }
 
 #[test]
+fn elevation_field_is_continuous() {
+    // Volleyball-seam regression: adjacent samples ~0.7 deg apart must never
+    // jump like cliffs. Old code: worst single-step jump 1.52; fixed field
+    // must stay under 0.35 everywhere on the same grid.
+    for seed in [1u64, 42, 7] {
+        let desc = generate(seed);
+        let anchor_body = desc.stars.len() + desc.anchor_planet;
+        let spec = TerrainSpec::for_body(seed, &desc, anchor_body).unwrap();
+        let (w, h) = (512usize, 256usize);
+        let map = spec.heightmap(w, h);
+        let mut worst = 0.0f64;
+        for r in 0..h {
+            for c in 0..w {
+                let here = map[r * w + c] as f64;
+                let right = map[r * w + (c + 1) % w] as f64;
+                worst = worst.max((here - right).abs());
+                if r + 1 < h {
+                    let down = map[(r + 1) * w + c] as f64;
+                    worst = worst.max((here - down).abs());
+                }
+            }
+        }
+        assert!(worst < 0.35, "seed {seed}: cliff discontinuity {worst}");
+    }
+}
+
+#[test]
 fn golden_terrain_hashes_are_pinned() {
     for seed in [1u64, 42, 123_456_789] {
         let path = format!("tests/golden/terrain-seed-{seed}.json");
