@@ -26,3 +26,9 @@ export function getTerrainTexture(sim: Sim, bodyIndex: number): THREE.CanvasText
   cache.set(key, tex);
   return tex;
 }
+
+/** Test hook + future-proofing for in-place seed switches (today reroll is a
+ * full page reload, so production never needs this). */
+export function clearTerrainCache(): void {
+  cache.clear();
+}

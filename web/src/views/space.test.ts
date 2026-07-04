@@ -1,12 +1,13 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { parseDescriptor } from '../sim/parse';
 import type { Sim } from '../sim/wasm';
 import { bodyLayout, parentIndex } from '../sim/layout';
 import { buildSpaceScene } from './space';
+import { clearTerrainCache } from './terrainCache';
 import { compressPosition } from './compression';
 import { AU_M } from '../sim/types';
 
@@ -122,6 +123,8 @@ function fakeSimWithDisplacedStars(): Sim {
 }
 
 describe('buildSpaceScene', () => {
+  beforeEach(() => clearTerrainCache());
+
   it('creates one mesh + label per body and orbit lines for non-stars', () => {
     const sim = fakeSim();
     const view = buildSpaceScene(sim);
@@ -274,6 +277,7 @@ describe('buildSpaceScene', () => {
 
   it('uses terrain textures when the sim provides them (headless canvas may still yield null)', () => {
     const sim = fakeSim();
+    sim.seed = 'terrain-scene-test';
     sim.bodyTerrainInfo = (i) => (i >= golden.stars.length ? { sea_level: 0, ocean_fraction: 0.6, relief_m: 6000, plate_count: 9 } : null);
     sim.bodyHeightmap = (i, w, h) => (i >= golden.stars.length ? new Float32Array(w * h) : new Float32Array(0));
     const view = buildSpaceScene(sim);
