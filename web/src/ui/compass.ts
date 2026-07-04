@@ -48,7 +48,9 @@ export function buildCompass(root: HTMLElement): Compass {
       if (latLon) {
         const ns = latLon.latDeg < 0 ? 'S' : 'N';
         const ew = latLon.lonDeg < 0 ? 'W' : 'E';
-        text += ` · ${Math.abs(latLon.latDeg).toFixed(1)}°${ns} ${Math.abs(latLon.lonDeg).toFixed(1)}°${ew}`;
+        // 3 decimals ≈ 111 m per tick — anything coarser and true-scale
+        // walking produces no visible change on any readout
+        text += ` · ${Math.abs(latLon.latDeg).toFixed(3)}°${ns} ${Math.abs(latLon.lonDeg).toFixed(3)}°${ew}`;
       }
       readout.textContent = text;
     },

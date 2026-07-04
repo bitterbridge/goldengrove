@@ -266,6 +266,10 @@ async function boot(): Promise<void> {
   const heldKeys = new Set<'w' | 'a' | 's' | 'd'>();
   let shiftHeld = false;
   const WALK_M_PER_S = 1.4;
+  // Shift is a 100 m/s "skim", not a sprint: at true planetary scale a ×5
+  // run is still invisible on every readout. Real traversal arrives with
+  // flight (Plan 2b); this keeps ground movement legible until then.
+  const SKIM_M_PER_S = 100;
   addEventListener('keydown', (e) => {
     if (document.activeElement instanceof HTMLInputElement) return;
     if (e.key === 'Shift') shiftHeld = true;
@@ -302,10 +306,10 @@ async function boot(): Promise<void> {
 
     if (current.view === 'ground' && current.body !== null) {
       if (heldKeys.size > 0 && current.lat !== null && current.lon !== null) {
-        const speedMult = shiftHeld ? 5 : 1;
+        const speedMps = shiftHeld ? SKIM_M_PER_S : WALK_M_PER_S;
         const rM = bodyRadiusM(sim.descriptor, layout[current.body]!);
         const degPerMeter = 180 / (Math.PI * rM);
-        const step = WALK_M_PER_S * speedMult * dt * degPerMeter;
+        const step = speedMps * dt * degPerMeter;
         let dF = 0, dR = 0; // forward, rightward relative to the compass heading
         if (heldKeys.has('w')) dF += 1;
         if (heldKeys.has('s')) dF -= 1;
