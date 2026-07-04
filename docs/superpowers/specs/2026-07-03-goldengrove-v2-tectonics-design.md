@@ -26,7 +26,8 @@ orrery. First stage of the long arc's pluggable generation pipeline.
 New pure crate `gg-terrain` (deps: gg-core, gg-gen types). Entry:
 
 ```
-TerrainSpec::for_body(seed: u64, desc: &SystemDescriptor, body: BodyIndexing) -> TerrainSpec
+TerrainSpec::for_body(seed: u64, desc: &SystemDescriptor, body_index: usize) -> Option<TerrainSpec>
+// body_index in ephemeris body order (stars, planets, moons grouped); None for non-terrain bodies
 elevation(&self, lat_deg: f64, lon_deg: f64) -> f64      // sea level = 0
 heightmap(&self, width, height) -> Vec<f32>               // equirect, row-major
 info(&self) -> TerrainInfo { sea_level, ocean_fraction, relief_m, plate_count, … }
@@ -56,9 +57,9 @@ Applies to rocky planets AND moons (standable bodies). Giants have no terrain.
 
 ## WASM Boundary
 
-- `planet_heightmap(body_index: usize, width: usize, height: usize) -> Float32Array`
+- `body_heightmap(body_index: usize, width: usize, height: usize) -> Float32Array`
   — equirect, row 0 = lat +90°, elevations with sea level at 0.
-- `planet_terrain_info(body_index: usize) -> String` (JSON: `sea_level`,
+- `body_terrain_info(body_index: usize) -> String` (JSON: `sea_level`,
   `ocean_fraction`, `relief_m`, `plate_count`).
 - Non-terrain bodies (stars, giants): empty array / error JSON — renderer skips.
 - Lazy: computed on first call; JS caches per body.
