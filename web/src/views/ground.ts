@@ -7,6 +7,7 @@ import { buildSkyDome, type SunSpec } from './sky';
 import { buildStarfield } from './starfield';
 import { temperatureToColor } from './color';
 import { proceduralBodyTexture } from './texture';
+import { getTerrainTexture } from './terrainCache';
 
 export interface Standing { body: number; latDeg: number; lonDeg: number }
 
@@ -60,7 +61,7 @@ export function buildGroundScene(sim: Sim): GroundView {
       mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(r, g, b) });
     } else {
       const baseHex = ref.kind === 'planet' ? PALETTE[desc.planets[ref.planet]!.class] : 0x8a8f98;
-      const tex = proceduralBodyTexture(sim.seed, i, baseHex);
+      const tex = getTerrainTexture(sim, i) ?? proceduralBodyTexture(sim.seed, i, baseHex);
       mat = new THREE.MeshStandardMaterial(tex ? { map: tex, roughness: 1 } : { color: baseHex, roughness: 1 });
     }
     const mesh = new THREE.Mesh(unit, mat);

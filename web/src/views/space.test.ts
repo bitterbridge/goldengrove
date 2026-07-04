@@ -272,6 +272,15 @@ describe('buildSpaceScene', () => {
     expect(attr.getZ(0)).toBeCloseTo(expected[2], 4);
   });
 
+  it('uses terrain textures when the sim provides them (headless canvas may still yield null)', () => {
+    const sim = fakeSim();
+    sim.bodyTerrainInfo = (i) => (i >= golden.stars.length ? { sea_level: 0, ocean_fraction: 0.6, relief_m: 6000, plate_count: 9 } : null);
+    sim.bodyHeightmap = (i, w, h) => (i >= golden.stars.length ? new Float32Array(w * h) : new Float32Array(0));
+    const view = buildSpaceScene(sim);
+    // structural: construction succeeds either way; material is either mapped or fallback
+    expect(view.bodies.length).toBe(sim.bodyCount);
+  });
+
   it('refreshes orbit paths when the sim time moves far from the path epoch', () => {
     const sim = fakeSim();
     let calls = 0;

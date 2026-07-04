@@ -4,6 +4,7 @@ import { bodyLayout, bodyName, bodyRadiusM, isTidallyLocked, parentIndex, type B
 import type { Sim } from '../sim/wasm';
 import { compressPosition, displayRadius, moonViewFactor } from './compression';
 import { temperatureToColor } from './color';
+import { getTerrainTexture } from './terrainCache';
 
 const ORBIT_SEGMENTS = 128;
 const PATH_REFRESH_S = 3.156e8; // ~10 Earth years: far below secular timescales, cheap to refresh
@@ -49,8 +50,11 @@ export function buildSpaceScene(sim: Sim): SpaceView {
       light.userData.followsBody = i;
     } else {
       const palette = { Rocky: 0x9b8f7a, IceGiant: 0x7ec8e3, GasGiant: 0xd8b27a } as const;
-      const color = ref.kind === 'planet' ? palette[sim.descriptor.planets[ref.planet]!.class] : 0x8a8f98;
-      material = new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
+      const terrain = getTerrainTexture(sim, i);
+      const baseHex = ref.kind === 'planet' ? palette[sim.descriptor.planets[ref.planet]!.class] : 0x8a8f98;
+      material = terrain
+        ? new THREE.MeshStandardMaterial({ map: terrain, roughness: 0.95 })
+        : new THREE.MeshStandardMaterial({ color: baseHex, roughness: 0.9 });
     }
     const mesh = new THREE.Mesh(unitSphere, material);
     mesh.name = `body-${i}`;
