@@ -187,10 +187,11 @@ fn golden_terrain_hashes_are_pinned() {
 
 #[test]
 fn micro_detail_is_small_and_continuous() {
-    // Amplitude budget: micro is a spectral tail; |micro| must stay under
-    // ~0.007 relative units (sum of its octave amplitudes), and adjacent
-    // samples 1e-5 rad apart (~60 m) must not jump more than the finest
-    // octaves can move.
+    // Amplitude budget: |micro| is bounded by its octave-amplitude sum,
+    // 0.07/(1-0.8) = 0.35 relative units worst case (empirical max is far
+    // lower; the 0.20 bound below holds with margin). Adjacent samples
+    // 1e-5 rad apart (~60 m) must not jump more than the finest octaves
+    // can move.
     let mut worst_val = 0.0f64;
     let mut worst_jump = 0.0f64;
     let mut prev: Option<f64> = None;
@@ -246,8 +247,11 @@ fn fine_terrain_has_walking_scale_relief() {
 #[test]
 fn elevation_fine_agrees_with_elevation_at_scale() {
     // fine = relief_m * (elevation + mask * micro): the base field is
-    // untouched, so fine/relief must stay within micro's masked octave sum
-    // (<= 0.194 relative units) of elevation() everywhere.
+    // untouched, so fine/relief must stay within micro's masked amplitude
+    // of elevation() everywhere. The geometric bound is 0.07/(1-0.8) = 0.35
+    // relative units; empirically the worst masked seam measures ~0.11, so
+    // the 0.20 assert below carries real margin while staying tight enough
+    // to catch an accidental amplitude blow-up.
     let desc = generate(42);
     let anchor = desc.stars.len() + desc.anchor_planet;
     let spec = TerrainSpec::for_body(42, &desc, anchor).unwrap();
