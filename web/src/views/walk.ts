@@ -22,3 +22,20 @@ export function stepLatLon(
   const newLonDeg = ((lonDeg + dLon + 540) % 360) - 180;
   return { latDeg: newLatDeg, lonDeg: newLonDeg };
 }
+
+/** Vertical flight integration: hold-to-ascend/descend, rate scales with
+ * altitude (min 2 m/s, alt/2 per second) so leaving the ground and reaching
+ * limb view both feel responsive. Altitude clamps to [0, 10 * radiusM]. */
+export function flightStep(altM: number, dUp: number, dtS: number, radiusM: number): number {
+  if (dUp === 0) return altM;
+  const rate = Math.max(2, altM / 2);
+  const next = altM + dUp * rate * dtS;
+  return Math.min(10 * radiusM, Math.max(0, next));
+}
+
+/** Horizontal ground-speed ladder: walking 1.4, Shift-skim 100, flying
+ * max(100, altM / 2) m/s. */
+export function groundSpeedMps(altM: number, shiftHeld: boolean): number {
+  if (altM > 0) return Math.max(100, altM / 2);
+  return shiftHeld ? 100 : 1.4;
+}

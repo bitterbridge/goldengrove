@@ -7,7 +7,7 @@ import { buildSpaceScene, type SpaceView } from './views/space';
 import { buildGroundScene, type GroundView } from './views/ground';
 import { buildTerrainGlobe, type TerrainGlobe } from './views/terrainGlobe';
 import { pointToLatLon, type Vec3 } from './views/observer';
-import { stepLatLon } from './views/walk';
+import { flightStep, groundSpeedMps, stepLatLon } from './views/walk';
 import { atmosphereDensityFor, bodyLayout, bodyRadiusM, parentIndex, standableBody } from './sim/layout';
 import { buildHud, formatDate } from './ui/hud';
 import { buildCompass } from './ui/compass';
@@ -176,6 +176,7 @@ async function boot(): Promise<void> {
     focused = body;
     yaw = 0;
     pitch = 0.15;
+    flightAltM = 0;
     refreshViewButton();
     compass.setVisible(true);
     if (clock.speed > 3600) { clock.speed = 3600; hud.setActiveSpeed(3600); }
@@ -188,6 +189,7 @@ async function boot(): Promise<void> {
     hideAllLabels();
     compass.setVisible(false);
     current.view = 'space';
+    flightAltM = 0;
     refreshViewButton();
     hud.setMaxSpeed(null);
     setStandingGlobe(null);
@@ -259,17 +261,17 @@ async function boot(): Promise<void> {
 
   // Surface walking: W/↑ forward, S/↓ backward, A/← strafe left, D/→ strafe
   // right, along the current compass heading; Shift for a 5x sprint.
+  // Hold R/F to ascend/descend into free flight; speed on both axes scales
+  // with altitude (walk.ts's flightStep/groundSpeedMps) so leaving the
+  // ground and reaching limb view both feel responsive.
   const WALK_KEY: Record<string, 'w' | 'a' | 's' | 'd'> = {
     w: 'w', a: 'a', s: 's', d: 'd',
     arrowup: 'w', arrowleft: 'a', arrowdown: 's', arrowright: 'd',
   };
   const heldKeys = new Set<'w' | 'a' | 's' | 'd'>();
   let shiftHeld = false;
-  const WALK_M_PER_S = 1.4;
-  // Shift is a 100 m/s "skim", not a sprint: at true planetary scale a ×5
-  // run is still invisible on every readout. Real traversal arrives with
-  // flight (Plan 2b); this keeps ground movement legible until then.
-  const SKIM_M_PER_S = 100;
+  let flightAltM = 0;
+  const flightKeys = new Set<'r' | 'f'>();
   addEventListener('keydown', (e) => {
     if (document.activeElement instanceof HTMLInputElement) return;
     if (e.key === 'Shift') shiftHeld = true;
@@ -278,14 +280,21 @@ async function boot(): Promise<void> {
       heldKeys.add(mapped);
       e.preventDefault();
     }
+    const key = e.key.toLowerCase();
+    if (key === 'r' || key === 'f') {
+      flightKeys.add(key);
+      e.preventDefault();
+    }
   });
   addEventListener('keyup', (e) => {
     if (document.activeElement instanceof HTMLInputElement) return;
     if (e.key === 'Shift') shiftHeld = false;
     const mapped = WALK_KEY[e.key.toLowerCase()];
     if (mapped && heldKeys.delete(mapped) && current.view === 'ground') syncUrl();
+    const key = e.key.toLowerCase();
+    if (key === 'r' || key === 'f') flightKeys.delete(key);
   });
-  addEventListener('blur', () => { heldKeys.clear(); shiftHeld = false; });
+  addEventListener('blur', () => { heldKeys.clear(); shiftHeld = false; flightKeys.clear(); });
 
   refreshViewButton();
   // Prime the view once so the host origin is known, then frame the camera
@@ -305,9 +314,13 @@ async function boot(): Promise<void> {
     const states = sim.statesAt(clock.t);
 
     if (current.view === 'ground' && current.body !== null) {
+      const rM = bodyRadiusM(sim.descriptor, layout[current.body]!);
+      const dUp = (flightKeys.has('r') ? 1 : 0) - (flightKeys.has('f') ? 1 : 0);
+      if (dUp !== 0) {
+        flightAltM = flightStep(flightAltM, dUp, dt, rM);
+      }
       if (heldKeys.size > 0 && current.lat !== null && current.lon !== null) {
-        const speedMps = shiftHeld ? SKIM_M_PER_S : WALK_M_PER_S;
-        const rM = bodyRadiusM(sim.descriptor, layout[current.body]!);
+        const speedMps = groundSpeedMps(flightAltM, shiftHeld);
         const degPerMeter = 180 / (Math.PI * rM);
         const step = speedMps * dt * degPerMeter;
         let dF = 0, dR = 0; // forward, rightward relative to the compass heading
@@ -324,8 +337,6 @@ async function boot(): Promise<void> {
       }
       renderer.autoClear = false;
       renderer.clear();
-      // flightAltM arrives in Task 4; ground observers are always at surface level until then.
-      const flightAltM = 0;
       const suns = ground.update(states, { body: current.body, latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 }, flightAltM);
       groundCamera.position.set(0, 0, 0);
       groundCamera.lookAt(Math.sin(yaw) * Math.cos(pitch), Math.cos(yaw) * Math.cos(pitch), Math.sin(pitch));
@@ -336,7 +347,7 @@ async function boot(): Promise<void> {
       }
       renderer.render(ground.scene, groundCamera);
       if (terrainGlobe) {
-        const eyeAlt = (currentElevationM ?? 0) + 1.7;
+        const eyeAlt = (currentElevationM ?? 0) + 1.7 + flightAltM;
         const atmDensity = atmosphereDensityFor(sim.descriptor, layout[current.body]!);
         terrainGlobe.update(current.lat ?? 0, current.lon ?? 0, eyeAlt, suns, 2, atmDensity, ground.dayFactor());
         renderer.clearDepth();
