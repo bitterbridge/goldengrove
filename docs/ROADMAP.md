@@ -30,51 +30,53 @@ git history, not here.
    Wilds arc — the space-view merge (one continuous scene, surface to
    interplanetary space) follows as its own stage after this one.
 8. Texture seam & pole polish — equirect artifacts at lon ±180° and the poles.
-9. Terrain-aware stand-here — spawn on land; show elevation in the HUD.
-10. Erosion pass — fluvial/thermal; softens the tectonic skeleton.
-11. Rivers and lakes — flow-routing over the heightmap.
+9. CDLOD geomorphing — committed follow-up to the quadtree terrain’s v1
+   skirts: shader-blended LOD transitions, no pops.
+10. Terrain-aware stand-here — spawn on land; show elevation in the HUD.
+11. Erosion pass — fluvial/thermal; softens the tectonic skeleton.
+12. Rivers and lakes — flow-routing over the heightmap.
 
 ## Climate & life (the next big generation stage)
 
-12. Climate model — insolation from the actual orbit (axial tilt,
+13. Climate model — insolation from the actual orbit (axial tilt,
     eccentricity → real seasons), latitude bands, rain shadow from the
     mountains we already generate.
-13. Biome palettes — climate × elevation → tundra/desert/forest coloring;
+14. Biome palettes — climate × elevation → tundra/desert/forest coloring;
     dead and doomed worlds get their own looks.
-14. Ocean currents & wind — named in the v1 spec's future list; feeds climate.
-15. Weather in ground view — clouds and haze tied to atmosphere density.
-16. Seasonal rendering — same world, different date, different snowline.
+15. Ocean currents & wind — named in the v1 spec's future list; feeds climate.
+16. Weather in ground view — clouds and haze tied to atmosphere density.
+17. Seasonal rendering — same world, different date, different snowline.
 
 ## Deep-time & astronomy upgrades
 
-17. Galactic context — simulate (in broad strokes) the galaxy the system sits
+18. Galactic context — simulate (in broad strokes) the galaxy the system sits
     in: seeded distance from the galactic core, a Milky-Way-like band in the
     sky when appropriate, richer star-density gradients; possibly a rendered
     supermassive black hole for systems seeded near the core.
-18. `CompiledNBody` ephemeris provider — integrate once at generation,
+19. `CompiledNBody` ephemeris provider — integrate once at generation,
     compress to Chebyshev segments; the pluggable ephemeris slot was designed
     for exactly this.
-19. Asteroid belts, comets, rings — giants are visually bare without rings.
-20. Eclipse/transit prediction — a "next interesting event" button; the dome
+20. Asteroid belts, comets, rings — giants are visually bare without rings.
+21. Eclipse/transit prediction — a "next interesting event" button; the dome
     ranking already produces eclipses.
-21. Axial-tilt seasons surfaced in calendars — solstice/equinox markers.
+22. Axial-tilt seasons surfaced in calendars — solstice/equinox markers.
 
 ## The MUD-shaped horizon
 
-22. Named places — procedural naming for continents, seas, ranges
+23. Named places — procedural naming for continents, seas, ranges
     (seed-derived, honors the no-editing rule).
-23. Flora/fauna generation — per-biome, seed-derived.
-24. Resources & civilizations — explicitly out-of-scoped in v1, still the
+24. Flora/fauna generation — per-biome, seed-derived.
+25. Resources & civilizations — explicitly out-of-scoped in v1, still the
     destination.
-25. Points of interest + efficient travel between them.
+26. Points of interest + efficient travel between them.
 
 ## Infrastructure & sharing
 
-26. CI supply-chain hardening — pin binaryen or set wasm-opt=false; the one
+27. CI supply-chain hardening — pin binaryen or set wasm-opt=false; the one
     flaky download left in CI.
-27. Sea-level bracket headroom `debug_assert` — empirical raw max 4.97 vs the
+28. Sea-level bracket headroom `debug_assert` — empirical raw max 4.97 vs the
     ±6 bisection bracket; cheap insurance.
-28. Seed gallery — a separate static page of curated seeds (e.g. the
+29. Seed gallery — a separate static page of curated seeds (e.g. the
     emergent-libration world 3630539713810705175).
-29. Screenshot/postcard export — the share button, but for images, with
+30. Screenshot/postcard export — the share button, but for images, with
     seed + URL baked into a caption.

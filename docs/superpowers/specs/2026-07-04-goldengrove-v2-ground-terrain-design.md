@@ -1,10 +1,12 @@
 # Goldengrove v2 — Ground-View 3D Terrain Design (Quadtree Cube-Sphere)
 
 **Date:** 2026-07-04
-**Status:** Draft — Nathan chose the global quadtree (Outer Wilds arc:
-smooth ground↔space movement eventually). Two sub-decisions taken on the
-recommended path in his absence, flagged at the bottom: free-flight ships
-this stage; LOD seams use skirts v1.
+**Status:** Approved — Nathan chose the global quadtree (Outer Wilds arc:
+smooth ground↔space movement eventually) and approved the recommended
+sub-decisions: free-flight ships this stage; LOD seams use skirts v1, with
+**CDLOD geomorphing as a committed follow-up stage** (his call), not merely
+a contingency. Tile mesh layout must not preclude it (uniform grids per
+tile, no T-junction stitching schemes that morphing can't express).
 
 ## Goal
 
@@ -181,7 +183,8 @@ The flat ground disc is deleted.
 ## Out of scope (deferred)
 
 Space-view merge (continuous surface↔interplanetary scene — next stage on
-this arc, gets its own spec), CDLOD geomorphing (skirts pop-fix follow-up),
+this arc, gets its own spec), CDLOD geomorphing (committed follow-up;
+skirts are the v1 seam strategy),
 erosion, rivers, slope-limited walking/collision, shadows, waves,
 spawn-on-land, biome coloring, texture splatting, URL-shareable flight
 moments.
