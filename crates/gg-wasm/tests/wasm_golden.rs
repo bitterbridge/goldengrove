@@ -53,3 +53,31 @@ fn junk_seeds_error_cleanly() {
         assert!(World::new(bad).is_err(), "seed {bad:?} should be rejected");
     }
 }
+
+#[wasm_bindgen_test]
+fn terrain_hashes_match_native_goldens_on_wasm32() {
+    for (seed, golden) in [
+        (1u64, include_str!("../../gg-terrain/tests/golden/terrain-seed-1.json")),
+        (42, include_str!("../../gg-terrain/tests/golden/terrain-seed-42.json")),
+        (123_456_789, include_str!("../../gg-terrain/tests/golden/terrain-seed-123456789.json")),
+    ] {
+        let expected: std::collections::BTreeMap<String, String> = serde_json::from_str(golden).unwrap();
+        let desc = gg_gen::generate(seed);
+        let total = desc.stars.len() + desc.planets.len()
+            + desc.planets.iter().map(|p| p.moons.len()).sum::<usize>();
+        let mut actual = std::collections::BTreeMap::new();
+        for body in 0..total {
+            if let Some(spec) = gg_terrain::TerrainSpec::for_body(seed, &desc, body) {
+                actual.insert(format!("body_{body}"), format!("{:#018x}", gg_terrain::heightmap_hash(&spec.heightmap(256, 128))));
+            }
+        }
+        assert_eq!(actual, expected, "seed {seed}: wasm32 terrain diverged from native");
+    }
+    // the World boundary itself (cache + marshaling) on wasm32:
+    let w = World::new("42").expect("valid seed");
+    assert_eq!(w.body_heightmap(0, 8, 4).length(), 0, "stars have no terrain");
+    let desc: serde_json::Value = serde_json::from_str(&w.descriptor_json().unwrap()).unwrap();
+    let anchor_body = desc["stars"].as_array().unwrap().len() + desc["anchor_planet"].as_u64().unwrap() as usize;
+    assert_eq!(w.body_heightmap(anchor_body, 8, 4).length(), 32);
+    assert_eq!(w.body_heightmap(anchor_body, 8, 4).length(), 32, "cached second call identical");
+}

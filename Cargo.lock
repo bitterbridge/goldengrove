@@ -121,6 +121,7 @@ dependencies = [
  "gg-core",
  "gg-ephemeris",
  "gg-gen",
+ "gg-terrain",
  "js-sys",
  "serde_json",
  "wasm-bindgen",

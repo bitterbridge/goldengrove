@@ -29,6 +29,8 @@ function fakeSim(): Sim {
     orbitPath: () => new Float64Array(0),
     anchorDate: () => ({ year: 0, day_of_year: 0, day_fraction: 0 }),
     hostOriginAt: () => new Float64Array(3),
+    bodyHeightmap: () => new Float32Array(0),
+    bodyTerrainInfo: () => null,
   };
 }
 

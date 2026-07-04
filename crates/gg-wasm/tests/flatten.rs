@@ -168,3 +168,15 @@ fn orbit_paths_follow_secular_drift() {
         "path did not move under 1 rad of apsidal drift"
     );
 }
+
+#[test]
+fn wasm_heightmaps_match_gg_terrain_directly() {
+    let desc = gg_gen::generate(42);
+    let anchor_body = desc.stars.len() + desc.anchor_planet;
+    let direct = gg_terrain::TerrainSpec::for_body(42, &desc, anchor_body)
+        .unwrap()
+        .heightmap(64, 32);
+    let world_map = gg_wasm::terrain_heightmap_native(&desc, 42, anchor_body, 64, 32);
+    assert_eq!(direct, world_map, "boundary must not transform terrain data");
+    assert!(gg_wasm::terrain_heightmap_native(&desc, 42, 0, 64, 32).is_empty(), "stars empty");
+}

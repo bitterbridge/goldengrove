@@ -54,6 +54,8 @@ function fakeSim(): Sim {
         (m0 * s[2]! + m1 * s[9]!) / w,
       ]);
     },
+    bodyHeightmap: () => new Float32Array(0),
+    bodyTerrainInfo: () => null,
   };
   return fake;
 }
@@ -113,6 +115,8 @@ function fakeSimWithDisplacedStars(): Sim {
         (m0 * s[2]! + m1 * s[9]!) / w,
       ]);
     },
+    bodyHeightmap: () => new Float32Array(0),
+    bodyTerrainInfo: () => null,
   };
   return fake;
 }

@@ -82,3 +82,5 @@ export interface SystemDescriptor {
 }
 
 export interface DateTime { year: number; day_of_year: number; day_fraction: number }
+
+export interface TerrainInfo { sea_level: number; ocean_fraction: number; relief_m: number; plate_count: number }
