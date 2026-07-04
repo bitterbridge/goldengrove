@@ -11,9 +11,15 @@ fn generates_valid_systems_for_many_seeds() {
         assert!(!desc.stars.is_empty() && !desc.planets.is_empty());
         let anchor = &desc.planets[desc.anchor_planet];
         assert_eq!(anchor.class, PlanetClass::Rocky, "seed {seed}");
-        assert!(anchor.calendar.is_some(), "seed {seed}: anchor must have a calendar");
+        assert!(
+            anchor.calendar.is_some(),
+            "seed {seed}: anchor must have a calendar"
+        );
         let cal = anchor.calendar.as_ref().unwrap();
-        assert!(cal.solar_day_s > 0.0 && cal.year_solar_days > 10.0, "seed {seed}");
+        assert!(
+            cal.solar_day_s > 0.0 && cal.year_solar_days > 10.0,
+            "seed {seed}"
+        );
         assert_eq!(cal.months.len(), anchor.moons.len(), "seed {seed}");
         for p in &desc.planets {
             assert!(p.mass_kg > 0.0 && p.radius_m > 0.0 && p.rotation_period_s > 0.0);
@@ -21,7 +27,10 @@ fn generates_valid_systems_for_many_seeds() {
         if desc.planet_host == PlanetHost::Barycenter {
             let sep = desc.stars[1].orbit.unwrap().semi_major_axis_m;
             let innermost = desc.planets[0].orbit.semi_major_axis_m;
-            assert!(innermost >= 3.0 * sep, "seed {seed}: circumbinary planet too close to the pair");
+            assert!(
+                innermost >= 3.0 * sep,
+                "seed {seed}: circumbinary planet too close to the pair"
+            );
         }
     }
 }
@@ -70,8 +79,13 @@ fn anchor_planets_are_in_the_hz_across_stellar_types() {
         let total_l: f64 = desc.stars.iter().map(|s| s.luminosity_w).sum();
         let (inner, outer) = habitable_zone_m(total_l);
         let a = desc.planets[desc.anchor_planet].orbit.semi_major_axis_m;
-        assert!(a >= 0.9 * inner && a <= 1.1 * outer,
-            "seed {seed}: anchor at {} AU, HZ [{}, {}]", a / AU, inner / AU, outer / AU);
+        assert!(
+            a >= 0.9 * inner && a <= 1.1 * outer,
+            "seed {seed}: anchor at {} AU, HZ [{}, {}]",
+            a / AU,
+            inner / AU,
+            outer / AU
+        );
     }
 }
 
@@ -79,7 +93,10 @@ fn anchor_planets_are_in_the_hz_across_stellar_types() {
 fn u64_max_seed_survives_json_roundtrip() {
     let desc = generate(u64::MAX);
     let json = serde_json::to_string(&desc).unwrap();
-    assert!(json.contains("\"18446744073709551615\""), "seed must serialize as string");
+    assert!(
+        json.contains("\"18446744073709551615\""),
+        "seed must serialize as string"
+    );
     let back: SystemDescriptor = serde_json::from_str(&json).unwrap();
     assert_eq!(desc, back);
 }

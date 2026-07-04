@@ -192,8 +192,10 @@ fn apsidal_drift_rotates_periapsis() {
     let angle = s1[1].position_m[1].atan2(s1[1].position_m[0]);
     // p0 was at angle 0; tolerate kepler-timing wiggle of a few degrees
     let diff = (angle - expected_angle).abs();
-    assert!(diff < 0.15 || (mag(p0) - mag(s1[1].position_m)).abs() < 0.05 * AU,
-        "periapsis did not advance as expected: angle {angle}, expected {expected_angle}");
+    assert!(
+        diff < 0.15 || (mag(p0) - mag(s1[1].position_m)).abs() < 0.05 * AU,
+        "periapsis did not advance as expected: angle {angle}, expected {expected_angle}"
+    );
 }
 
 #[test]
@@ -203,7 +205,7 @@ fn spin_axis_precesses_and_rotation_advances() {
     let eph = KeplerSecular::new(desc);
     let s0 = eph.states_at(0.0);
     let s1 = eph.states_at(3.15e11); // ~10,000 years
-    // tilt magnitude preserved
+                                     // tilt magnitude preserved
     let z0 = s0[1].spin_axis[2];
     let z1 = s1[1].spin_axis[2];
     assert!((z0 - z1).abs() < 1e-9, "tilt changed");
@@ -274,7 +276,10 @@ fn secular_extrapolation_stays_physical() {
         mass_kg: 7.3e22,
         radius_m: 1.7e6,
         orbit: circular(epoch_a),
-        secular: SecularRates { migration_m_per_s: -1.0, ..SecularRates::default() },
+        secular: SecularRates {
+            migration_m_per_s: -1.0,
+            ..SecularRates::default()
+        },
         tidally_locked: true,
         rotation_period_s: 2.36e6,
         doom_time_s: None,

@@ -377,7 +377,10 @@ impl TerrainSpec {
     /// Batched elevation_fine: coords is [lat0, lon0, lat1, lon1, ...] in
     /// degrees. One FFI crossing per terrain tile build.
     pub fn elevation_fine_batch(&self, coords: &[f64]) -> Vec<f32> {
-        debug_assert!(coords.len().is_multiple_of(2), "coords must be lat/lon pairs");
+        debug_assert!(
+            coords.len().is_multiple_of(2),
+            "coords must be lat/lon pairs"
+        );
         coords
             .chunks_exact(2)
             .map(|c| self.elevation_fine(c[0], c[1]) as f32)

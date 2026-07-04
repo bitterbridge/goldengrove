@@ -30,12 +30,18 @@ fn derive_seed(base: u64, label: &str) -> u64 {
 
 impl RngStream {
     pub fn root(seed: u64) -> Self {
-        Self { base: seed, rng: Pcg64::seed_from_u64(seed) }
+        Self {
+            base: seed,
+            rng: Pcg64::seed_from_u64(seed),
+        }
     }
 
     pub fn child(&self, label: &str) -> Self {
         let seed = derive_seed(self.base, label);
-        Self { base: seed, rng: Pcg64::seed_from_u64(seed) }
+        Self {
+            base: seed,
+            rng: Pcg64::seed_from_u64(seed),
+        }
     }
 
     pub fn uniform(&mut self, lo: f64, hi: f64) -> f64 {
@@ -44,17 +50,26 @@ impl RngStream {
     }
 
     pub fn log_uniform(&mut self, lo: f64, hi: f64) -> f64 {
-        debug_assert!(0.0 < lo && lo <= hi, "log_uniform: need 0 < lo <= hi, got [{lo}, {hi}]");
+        debug_assert!(
+            0.0 < lo && lo <= hi,
+            "log_uniform: need 0 < lo <= hi, got [{lo}, {hi}]"
+        );
         math::exp(self.uniform(math::ln(lo), math::ln(hi)))
     }
 
     /// Sample p(x) ∝ x^(-alpha) on [lo, hi] by inverse CDF. Requires alpha != 1.
     pub fn power_law(&mut self, alpha: f64, lo: f64, hi: f64) -> f64 {
         debug_assert!(alpha != 1.0, "power_law: alpha == 1 divides by zero");
-        debug_assert!(0.0 < lo && lo <= hi, "power_law: need 0 < lo <= hi, got [{lo}, {hi}]");
+        debug_assert!(
+            0.0 < lo && lo <= hi,
+            "power_law: need 0 < lo <= hi, got [{lo}, {hi}]"
+        );
         let u = self.rng.gen::<f64>();
         let k = 1.0 - alpha;
-        math::powf(math::powf(lo, k) * (1.0 - u) + math::powf(hi, k) * u, 1.0 / k)
+        math::powf(
+            math::powf(lo, k) * (1.0 - u) + math::powf(hi, k) * u,
+            1.0 / k,
+        )
     }
 
     pub fn chance(&mut self, p: f64) -> bool {

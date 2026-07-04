@@ -13,8 +13,20 @@ fn earth_solar_day_from_sidereal() {
 fn earth_leap_rule_is_the_classic() {
     let rule = leap_rule(365.2422);
     assert_eq!(rule.base_days, 365);
-    assert_eq!(rule.terms[0], LeapTerm { every_years: 4, add_days: 1 });
-    assert_eq!(rule.terms[1], LeapTerm { every_years: 128, add_days: -1 });
+    assert_eq!(
+        rule.terms[0],
+        LeapTerm {
+            every_years: 4,
+            add_days: 1
+        }
+    );
+    assert_eq!(
+        rule.terms[1],
+        LeapTerm {
+            every_years: 128,
+            add_days: -1
+        }
+    );
     assert_eq!(rule.terms.len(), 2);
 }
 
@@ -57,8 +69,17 @@ fn high_fraction_year_leads_with_every_year_term() {
     // 365.76: first convergent is +1 every year (base stays 365), then corrections
     let rule = leap_rule(365.76);
     assert_eq!(rule.base_days, 365);
-    assert_eq!(rule.terms[0], LeapTerm { every_years: 1, add_days: 1 });
-    assert!(rule.terms.len() >= 2, "needs a negative correction after the +1/1 term");
+    assert_eq!(
+        rule.terms[0],
+        LeapTerm {
+            every_years: 1,
+            add_days: 1
+        }
+    );
+    assert!(
+        rule.terms.len() >= 2,
+        "needs a negative correction after the +1/1 term"
+    );
     assert_eq!(rule.terms[1].add_days, -1);
 }
 

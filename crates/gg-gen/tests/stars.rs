@@ -12,7 +12,10 @@ fn sunlike_relations_match_the_sun() {
     let t = temperature_k(l, r);
     assert!((t / T_SUN - 1.0).abs() < 0.05);
     let life = ms_lifetime_s(M_SUN);
-    assert!((life / (10e9 * 3.156e7) - 1.0).abs() < 0.1, "sun lifetime {life}");
+    assert!(
+        (life / (10e9 * 3.156e7) - 1.0).abs() < 0.1,
+        "sun lifetime {life}"
+    );
 }
 
 #[test]
@@ -42,7 +45,11 @@ fn population_properties_hold_over_many_seeds() {
             assert!(c.mass_kg < primary.mass_kg);
             let a = orbit.semi_major_axis_m;
             // close pair or wide companion, never in the planet-forming middle
-            assert!(a <= 0.25 * AU || a >= 50.0 * AU, "seed {seed}: companion at {} AU", a / AU);
+            assert!(
+                a <= 0.25 * AU || a >= 50.0 * AU,
+                "seed {seed}: companion at {} AU",
+                a / AU
+            );
         }
     }
     // ~55% singles; loose bounds so the test isn't seed-brittle
@@ -54,9 +61,10 @@ fn close_binary_means_circumbinary_planets() {
     for seed in 0..500u64 {
         let mut rng = RngStream::root(seed).child("stars");
         let out = generate_stars(&mut rng);
-        let has_close_pair = out.stars.get(1).is_some_and(|c| {
-            c.orbit.unwrap().semi_major_axis_m < 1.0 * AU
-        });
+        let has_close_pair = out
+            .stars
+            .get(1)
+            .is_some_and(|c| c.orbit.unwrap().semi_major_axis_m < 1.0 * AU);
         if has_close_pair {
             assert_eq!(out.planet_host, PlanetHost::Barycenter, "seed {seed}");
         }

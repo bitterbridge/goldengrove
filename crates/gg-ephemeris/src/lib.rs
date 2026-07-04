@@ -25,7 +25,10 @@ pub fn planet_index(desc: &SystemDescriptor, i: usize) -> usize {
 pub fn moon_index(desc: &SystemDescriptor, planet: usize, moon: usize) -> usize {
     desc.stars.len()
         + desc.planets.len()
-        + desc.planets[..planet].iter().map(|p| p.moons.len()).sum::<usize>()
+        + desc.planets[..planet]
+            .iter()
+            .map(|p| p.moons.len())
+            .sum::<usize>()
         + moon
 }
 
@@ -36,7 +39,11 @@ pub struct KeplerSecular {
 /// Orbital elements with secular drift applied at time t. Public so the
 /// boundary crate samples orbit PATHS from the same drifted elements the
 /// position evaluation uses — one authority, like host_origin_at.
-pub fn elements_at(el: &OrbitalElements, sec: &gg_gen::descriptor::SecularRates, t_s: f64) -> OrbitalElements {
+pub fn elements_at(
+    el: &OrbitalElements,
+    sec: &gg_gen::descriptor::SecularRates,
+    t_s: f64,
+) -> OrbitalElements {
     let mut e = *el;
     e.arg_periapsis_rad += sec.apsidal_rad_per_s * t_s;
     e.raan_rad += sec.nodal_rad_per_s * t_s;
@@ -126,7 +133,12 @@ impl Ephemeris for KeplerSecular {
     fn body_count(&self) -> usize {
         self.desc.stars.len()
             + self.desc.planets.len()
-            + self.desc.planets.iter().map(|p| p.moons.len()).sum::<usize>()
+            + self
+                .desc
+                .planets
+                .iter()
+                .map(|p| p.moons.len())
+                .sum::<usize>()
     }
 
     fn states_at(&self, t_s: f64) -> Vec<BodyState> {

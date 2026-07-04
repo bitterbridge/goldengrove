@@ -17,8 +17,16 @@ fn sunlike_ctx() -> StellarContext {
 #[test]
 fn habitable_zone_matches_published_sunlike_values() {
     let (inner, outer) = habitable_zone_m(L_SUN);
-    assert!((0.90..=1.00).contains(&(inner / AU)), "inner {}", inner / AU);
-    assert!((1.30..=1.45).contains(&(outer / AU)), "outer {}", outer / AU);
+    assert!(
+        (0.90..=1.00).contains(&(inner / AU)),
+        "inner {}",
+        inner / AU
+    );
+    assert!(
+        (1.30..=1.45).contains(&(outer / AU)),
+        "outer {}",
+        outer / AU
+    );
     assert!((2.5..=2.9).contains(&(frost_line_m(L_SUN) / AU)));
 }
 
@@ -47,7 +55,11 @@ fn every_system_has_exactly_one_rocky_anchor_in_hz() {
         assert_eq!(a_planet.class, PlanetClass::Rocky, "seed {seed}");
         let (inner, outer) = habitable_zone_m(L_SUN);
         let a = a_planet.orbit.semi_major_axis_m;
-        assert!(a >= 0.95 * inner && a <= 1.05 * outer, "seed {seed}: anchor at {} AU", a / AU);
+        assert!(
+            a >= 0.95 * inner && a <= 1.05 * outer,
+            "seed {seed}: anchor at {} AU",
+            a / AU
+        );
     }
 }
 
@@ -65,14 +77,21 @@ fn orbits_sorted_spaced_and_classified() {
             let a2 = p2.orbit.semi_major_axis_m;
             assert!(a2 > a1, "seed {seed}: not sorted");
             // mutual Hill spacing >= 8 (spec stability criterion)
-            let rh = (((p1.mass_kg + p2.mass_kg) / (3.0 * ctx.total_mass_kg)).cbrt())
-                * (a1 + a2)
-                / 2.0;
-            assert!((a2 - a1) / rh >= 8.0, "seed {seed}: spacing {}", (a2 - a1) / rh);
+            let rh =
+                (((p1.mass_kg + p2.mass_kg) / (3.0 * ctx.total_mass_kg)).cbrt()) * (a1 + a2) / 2.0;
+            assert!(
+                (a2 - a1) / rh >= 8.0,
+                "seed {seed}: spacing {}",
+                (a2 - a1) / rh
+            );
         }
         for p in &planets {
             if p.orbit.semi_major_axis_m < frost {
-                assert_eq!(p.class, PlanetClass::Rocky, "seed {seed}: giant inside frost line");
+                assert_eq!(
+                    p.class,
+                    PlanetClass::Rocky,
+                    "seed {seed}: giant inside frost line"
+                );
             }
             assert!(p.mass_kg > 0.0 && p.radius_m > 0.0);
             assert!(p.rotation_period_s > 4.0 * 3600.0);
@@ -109,10 +128,13 @@ fn low_mass_hosts_terminate_and_stay_spaced() {
             let a1 = p1.orbit.semi_major_axis_m;
             let a2 = p2.orbit.semi_major_axis_m;
             assert!(a2 > a1, "seed {seed}: not sorted");
-            let rh = (((p1.mass_kg + p2.mass_kg) / (3.0 * ctx.total_mass_kg)).cbrt())
-                * (a1 + a2)
-                / 2.0;
-            assert!((a2 - a1) / rh >= 7.99, "seed {seed}: spacing {}", (a2 - a1) / rh);
+            let rh =
+                (((p1.mass_kg + p2.mass_kg) / (3.0 * ctx.total_mass_kg)).cbrt()) * (a1 + a2) / 2.0;
+            assert!(
+                (a2 - a1) / rh >= 7.99,
+                "seed {seed}: spacing {}",
+                (a2 - a1) / rh
+            );
         }
 
         let a_planet = &planets[anchor];
@@ -180,8 +202,14 @@ fn old_stars_doom_by_star_death() {
         let (planets, anchor) = generate_planets(&mut rng, &ctx);
         if let WorldState::Doomed { doom_time_s } = planets[anchor].state {
             doomed_seen += 1;
-            assert!((doom_time_s - remaining).abs() < 1.0, "seed {seed}: doom {doom_time_s} != star remaining {remaining}");
+            assert!(
+                (doom_time_s - remaining).abs() < 1.0,
+                "seed {seed}: doom {doom_time_s} != star remaining {remaining}"
+            );
         }
     }
-    assert!(doomed_seen >= 10, "8% of 300 should be doomed, saw {doomed_seen}");
+    assert!(
+        doomed_seen >= 10,
+        "8% of 300 should be doomed, saw {doomed_seen}"
+    );
 }

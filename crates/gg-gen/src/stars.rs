@@ -26,7 +26,11 @@ pub fn luminosity_w(mass_kg: f64) -> f64 {
 
 pub fn radius_m(mass_kg: f64) -> f64 {
     let m = mass_kg / M_SUN;
-    let r = if m < 1.0 { math::powf(m, 0.8) } else { math::powf(m, 0.57) };
+    let r = if m < 1.0 {
+        math::powf(m, 0.8)
+    } else {
+        math::powf(m, 0.57)
+    };
     r * R_SUN
 }
 
@@ -79,7 +83,13 @@ pub fn generate_stars(rng: &mut RngStream) -> StarsOutput {
     let mut stars = vec![make_star(primary_mass, None)];
 
     let roll = rng.uniform(0.0, 1.0);
-    let multiplicity = if roll < 0.55 { 1 } else if roll < 0.90 { 2 } else { 3 };
+    let multiplicity = if roll < 0.55 {
+        1
+    } else if roll < 0.90 {
+        2
+    } else {
+        3
+    };
 
     let mut planet_host = PlanetHost::Primary;
     for k in 1..multiplicity {
@@ -106,5 +116,9 @@ pub fn generate_stars(rng: &mut RngStream) -> StarsOutput {
     let lifetime = stars[0].main_sequence_lifetime_s;
     let age_s = rng.uniform(0.1, 0.97) * lifetime.min(12e9 * YEAR_APPROX);
 
-    StarsOutput { stars, planet_host, age_s }
+    StarsOutput {
+        stars,
+        planet_host,
+        age_s,
+    }
 }

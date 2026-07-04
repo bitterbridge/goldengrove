@@ -33,11 +33,19 @@ fn orbit_paths_have_right_shape() {
         let (a, e) = (orbit.semi_major_axis_m, orbit.eccentricity);
         for chunk in path.chunks(3) {
             let r = (chunk[0].powi(2) + chunk[1].powi(2) + chunk[2].powi(2)).sqrt();
-            assert!(r >= a * (1.0 - e) * 0.999 && r <= a * (1.0 + e) * 1.001, "planet {p}: r {r} outside ellipse bounds");
+            assert!(
+                r >= a * (1.0 - e) * 0.999 && r <= a * (1.0 + e) * 1.001,
+                "planet {p}: r {r} outside ellipse bounds"
+            );
         }
     }
     // first moon (if any): same property around its planet's mu
-    if let Some((pi, _)) = desc.planets.iter().enumerate().find(|(_, p)| !p.moons.is_empty()) {
+    if let Some((pi, _)) = desc
+        .planets
+        .iter()
+        .enumerate()
+        .find(|(_, p)| !p.moons.is_empty())
+    {
         let moons_before: usize = desc.planets[..pi].iter().map(|p| p.moons.len()).sum();
         let body = stars + planets + moons_before;
         let path = orbit_path_points(&desc, body, 32, 0.0);
@@ -66,9 +74,16 @@ fn host_mass_mirror_matches_ephemeris_exactly() {
         }
         let mirror = gg_wasm::flatten::planet_host_mass(&desc);
         let eph = KeplerSecular::new(desc);
-        assert_eq!(mirror, eph.host_mass(), "seed {seed}: host-mass conventions diverged");
+        assert_eq!(
+            mirror,
+            eph.host_mass(),
+            "seed {seed}: host-mass conventions diverged"
+        );
     }
-    assert!(saw_barycenter && saw_primary, "seed range must cover both host variants");
+    assert!(
+        saw_barycenter && saw_primary,
+        "seed range must cover both host variants"
+    );
 }
 
 #[test]
@@ -110,7 +125,10 @@ fn orbit_path_origins_and_indexing_agree_with_ephemeris_at_epoch() {
         }
         checked_barycenter |= is_barycenter;
     }
-    assert!(checked_barycenter, "no circumbinary system in seed range — widen it");
+    assert!(
+        checked_barycenter,
+        "no circumbinary system in seed range — widen it"
+    );
 }
 
 #[test]
@@ -177,6 +195,12 @@ fn wasm_heightmaps_match_gg_terrain_directly() {
         .unwrap()
         .heightmap(64, 32);
     let world_map = gg_wasm::terrain_heightmap_native(&desc, 42, anchor_body, 64, 32);
-    assert_eq!(direct, world_map, "boundary must not transform terrain data");
-    assert!(gg_wasm::terrain_heightmap_native(&desc, 42, 0, 64, 32).is_empty(), "stars empty");
+    assert_eq!(
+        direct, world_map,
+        "boundary must not transform terrain data"
+    );
+    assert!(
+        gg_wasm::terrain_heightmap_native(&desc, 42, 0, 64, 32).is_empty(),
+        "stars empty"
+    );
 }

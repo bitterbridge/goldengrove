@@ -30,7 +30,10 @@ pub fn leap_rule(year_solar_days: f64) -> LeapRule {
         }
         let every_years = (1.0 / r.abs()).round().max(1.0) as u32;
         let add_days = if r > 0.0 { 1 } else { -1 };
-        terms.push(LeapTerm { every_years, add_days });
+        terms.push(LeapTerm {
+            every_years,
+            add_days,
+        });
         r -= f64::from(add_days) / f64::from(every_years);
     }
     LeapRule { base_days, terms }
@@ -82,7 +85,10 @@ pub fn derive_calendar(planet: &Planet, year_s: f64) -> Calendar {
             let t_moon = orbital_period_s(m.orbit.semi_major_axis_m, G * planet.mass_kg);
             // Synodic period as seen from the planet: 1/syn = 1/T_moon - 1/T_year.
             let synodic_s = 1.0 / (1.0 / t_moon - 1.0 / year_s);
-            MonthCycle { moon_index: i, synodic_days: synodic_s / solar_day }
+            MonthCycle {
+                moon_index: i,
+                synodic_days: synodic_s / solar_day,
+            }
         })
         .collect();
     Calendar {

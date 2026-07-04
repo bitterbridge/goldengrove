@@ -51,5 +51,8 @@ fn power_law_favors_small_values() {
     let below = (0..10_000)
         .filter(|_| r.power_law(1.8, 0.1, 10.0) < 1.0)
         .count();
-    assert!(below > 6_000, "power law should concentrate mass at small x, got {below}");
+    assert!(
+        below > 6_000,
+        "power law should concentrate mass at small x, got {below}"
+    );
 }

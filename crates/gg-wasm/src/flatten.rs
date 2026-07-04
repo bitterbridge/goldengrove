@@ -33,7 +33,12 @@ pub fn planet_host_mass(desc: &SystemDescriptor) -> f64 {
 /// steps, positions RELATIVE to the parent focus, from elements with secular
 /// drift applied at `t_s` (so the path's periapsis matches the body's actual
 /// position at that time — see gg_ephemeris::elements_at). Stars: empty.
-pub fn orbit_path_points(desc: &SystemDescriptor, body_index: usize, segments: usize, t_s: f64) -> Vec<f64> {
+pub fn orbit_path_points(
+    desc: &SystemDescriptor,
+    body_index: usize,
+    segments: usize,
+    t_s: f64,
+) -> Vec<f64> {
     let stars = desc.stars.len();
     let planets = desc.planets.len();
     let (elements, secular, mu) = if body_index < stars {

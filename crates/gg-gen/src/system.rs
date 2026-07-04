@@ -55,8 +55,10 @@ pub fn generate(seed: u64) -> SystemDescriptor {
         generate_moons(&mut moon_rng, planet, period, &ctx);
     }
 
-    let anchor_year =
-        orbital_period_s(planets[anchor_index].orbit.semi_major_axis_m, G * ctx.host_mass_kg);
+    let anchor_year = orbital_period_s(
+        planets[anchor_index].orbit.semi_major_axis_m,
+        G * ctx.host_mass_kg,
+    );
     let anchor_calendar = derive_calendar(&planets[anchor_index], anchor_year);
     planets[anchor_index].calendar = Some(anchor_calendar);
 

@@ -49,10 +49,8 @@ pub fn moon_physics(
 
     // Tidal migration: da/dt = K (m/M)(R/a)^5 n a; sign from synchronous orbit.
     let outward = moon_period > planet.rotation_period_s;
-    let mag = TIDAL_K * (moon_mass_kg / planet.mass_kg)
-        * (planet.radius_m / a).powi(5)
-        * n_moon
-        * a;
+    let mag =
+        TIDAL_K * (moon_mass_kg / planet.mass_kg) * (planet.radius_m / a).powi(5) * n_moon * a;
     let migration = if outward { mag } else { -mag };
 
     // Doom date: linearized time to Roche crossing for inward migrators.
@@ -131,12 +129,20 @@ pub fn generate_moons(
             let first = usize::from(rng.chance(p_first));
             // second-moon roll must be drawn unconditionally: fixed draw order
             let second = usize::from(rng.chance(0.15));
-            if first == 0 { 0 } else { first + second }
+            if first == 0 {
+                0
+            } else {
+                first + second
+            }
         }
         _ => rng.pick_count(2, 6),
     };
 
-    let hill = hill_radius_m(planet.orbit.semi_major_axis_m, planet.mass_kg, ctx.total_mass_kg);
+    let hill = hill_radius_m(
+        planet.orbit.semi_major_axis_m,
+        planet.mass_kg,
+        ctx.total_mass_kg,
+    );
     let roche = roche_limit_m(
         planet.radius_m,
         density(planet.mass_kg, planet.radius_m),
@@ -166,7 +172,8 @@ pub fn generate_moons(
             arg_periapsis_rad: rng.uniform(0.0, TAU),
             mean_anomaly_epoch_rad: rng.uniform(0.0, TAU),
         };
-        let (secular, locked, doom) = moon_physics(planet, moon_mass, &orbit, planet_orbit_period_s);
+        let (secular, locked, doom) =
+            moon_physics(planet, moon_mass, &orbit, planet_orbit_period_s);
         let rotation = if locked {
             orbital_period_s(a, G * planet.mass_kg)
         } else {
@@ -193,9 +200,15 @@ pub fn generate_moons(
         .fold(f64::INFINITY, f64::min);
     if soonest_doom < 1e8 * YEAR_APPROX {
         match planet.state {
-            WorldState::Living => planet.state = WorldState::Doomed { doom_time_s: soonest_doom },
+            WorldState::Living => {
+                planet.state = WorldState::Doomed {
+                    doom_time_s: soonest_doom,
+                }
+            }
             WorldState::Doomed { doom_time_s } if soonest_doom < doom_time_s => {
-                planet.state = WorldState::Doomed { doom_time_s: soonest_doom };
+                planet.state = WorldState::Doomed {
+                    doom_time_s: soonest_doom,
+                };
             }
             _ => {}
         }

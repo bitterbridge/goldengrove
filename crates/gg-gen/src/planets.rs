@@ -53,7 +53,13 @@ fn class_beyond_frost(rng: &mut RngStream) -> PlanetClass {
     }
 }
 
-fn sample_planet(rng: &mut RngStream, a_m: f64, frost_m: f64, ctx: &StellarContext, force_rocky_hz: bool) -> Planet {
+fn sample_planet(
+    rng: &mut RngStream,
+    a_m: f64,
+    frost_m: f64,
+    ctx: &StellarContext,
+    force_rocky_hz: bool,
+) -> Planet {
     let class = if force_rocky_hz || a_m < frost_m {
         PlanetClass::Rocky
     } else {
@@ -71,12 +77,20 @@ fn sample_planet(rng: &mut RngStream, a_m: f64, frost_m: f64, ctx: &StellarConte
         PlanetClass::IceGiant => {
             let m = rng.log_uniform(6.0, 30.0) * M_EARTH;
             // Neptune-calibrated: 17 M_E -> ~3.9 R_E
-            (m, R_EARTH * math::powf(m / M_EARTH, 0.5), rng.log_uniform(9.0, 20.0) * 3600.0)
+            (
+                m,
+                R_EARTH * math::powf(m / M_EARTH, 0.5),
+                rng.log_uniform(9.0, 20.0) * 3600.0,
+            )
         }
         PlanetClass::GasGiant => {
             let m = rng.log_uniform(40.0, 2500.0) * M_EARTH;
             // Gas giant radii are nearly mass-independent (~1 R_jup).
-            (m, rng.uniform(10.0, 12.0) * R_EARTH, rng.log_uniform(9.0, 20.0) * 3600.0)
+            (
+                m,
+                rng.uniform(10.0, 12.0) * R_EARTH,
+                rng.log_uniform(9.0, 20.0) * 3600.0,
+            )
         }
     };
 
@@ -113,7 +127,7 @@ fn sample_planet(rng: &mut RngStream, a_m: f64, frost_m: f64, ctx: &StellarConte
         axial_tilt_rad,
         axial_precession_rad_per_s: 0.0, // needs moon torques; set in Task 5
         rotation_period_s,
-        spin_drift_s_per_s: 0.0, // set in Task 5
+        spin_drift_s_per_s: 0.0,   // set in Task 5
         state: WorldState::Living, // anchor state rolled below; others stay Living
         moons: Vec::new(),
         calendar: None,

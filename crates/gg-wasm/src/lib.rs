@@ -48,7 +48,8 @@ impl World {
     }
 
     pub fn descriptor_json(&self) -> Result<String, JsError> {
-        serde_json::to_string(self.eph.desc()).map_err(|e| JsError::new(&format!("descriptor serialization failed: {e}")))
+        serde_json::to_string(self.eph.desc())
+            .map_err(|e| JsError::new(&format!("descriptor serialization failed: {e}")))
     }
 
     pub fn body_count(&self) -> usize {
@@ -63,7 +64,9 @@ impl World {
     /// 3 f64 per segment, relative to the parent focus, sampled from the
     /// secular-drifted elements at time t. Empty for stars.
     pub fn orbit_path(&self, body_index: usize, segments: usize, t_s: f64) -> js_sys::Float64Array {
-        js_sys::Float64Array::from(orbit_path_points(self.eph.desc(), body_index, segments, t_s).as_slice())
+        js_sys::Float64Array::from(
+            orbit_path_points(self.eph.desc(), body_index, segments, t_s).as_slice(),
+        )
     }
 
     /// [x, y, z] of the point planets orbit, meters.
@@ -82,16 +85,25 @@ impl World {
             .map_err(|e| JsError::new(&format!("date serialization failed: {e}")))
     }
 
-    fn with_terrain<R>(&self, body_index: usize, f: impl FnOnce(Option<&gg_terrain::TerrainSpec>) -> R) -> R {
+    fn with_terrain<R>(
+        &self,
+        body_index: usize,
+        f: impl FnOnce(Option<&gg_terrain::TerrainSpec>) -> R,
+    ) -> R {
         let mut cache = self.terrain.borrow_mut();
-        let entry = cache
-            .entry(body_index)
-            .or_insert_with(|| gg_terrain::TerrainSpec::for_body(self.seed, self.eph.desc(), body_index));
+        let entry = cache.entry(body_index).or_insert_with(|| {
+            gg_terrain::TerrainSpec::for_body(self.seed, self.eph.desc(), body_index)
+        });
         f(entry.as_ref())
     }
 
     /// Equirect heightmap (row 0 = lat +90). Empty array = no terrain body.
-    pub fn body_heightmap(&self, body_index: usize, width: usize, height: usize) -> js_sys::Float32Array {
+    pub fn body_heightmap(
+        &self,
+        body_index: usize,
+        width: usize,
+        height: usize,
+    ) -> js_sys::Float32Array {
         self.with_terrain(body_index, |spec| match spec {
             Some(s) => js_sys::Float32Array::from(s.heightmap(width, height).as_slice()),
             None => js_sys::Float32Array::new_with_length(0),

@@ -81,12 +81,7 @@ fn earth_moon_calibration() {
         mean_anomaly_epoch_rad: 0.0,
     };
     let planet_period = orbital_period_s(AU, G * M_SUN);
-    let (secular, locked, doom) = moon_physics(
-        &mut p,
-        7.342e22,
-        &moon_orbit,
-        planet_period,
-    );
+    let (secular, locked, doom) = moon_physics(&mut p, 7.342e22, &moon_orbit, planet_period);
     assert!(locked);
     assert!(doom.is_none(), "the Moon is not doomed");
     // Lunar recession 3.8 cm/yr = 1.2e-9 m/s, within a factor of ~1.5
@@ -95,10 +90,16 @@ fn earth_moon_calibration() {
     assert!((0.6e-9..2.0e-9).contains(&mig), "migration {mig}");
     // Nodal regression period ~18.6 years, within ~30%
     let nodal_period_yr = (std::f64::consts::TAU / secular.nodal_rad_per_s.abs()) / 3.156e7;
-    assert!((13.0..25.0).contains(&nodal_period_yr), "nodal {nodal_period_yr} yr");
+    assert!(
+        (13.0..25.0).contains(&nodal_period_yr),
+        "nodal {nodal_period_yr} yr"
+    );
     // Axial precession period in the 15k-40k year range (actual: 25.8k)
     let prec_yr = (std::f64::consts::TAU / p.axial_precession_rad_per_s) / 3.156e7;
-    assert!((15_000.0..40_000.0).contains(&prec_yr), "precession {prec_yr} yr");
+    assert!(
+        (15_000.0..40_000.0).contains(&prec_yr),
+        "precession {prec_yr} yr"
+    );
 }
 
 #[test]
@@ -138,19 +139,31 @@ fn inward_spiraling_moon_dooms_a_living_world() {
         p.rotation_period_s = 2000.0 * 3600.0; // slower than any moon orbit
         let period = orbital_period_s(AU, G * M_SUN);
         generate_moons(&mut rng, &mut p, period, &sunlike_ctx());
-        let soonest = p.moons.iter().filter_map(|m| m.doom_time_s).fold(f64::INFINITY, f64::min);
+        let soonest = p
+            .moons
+            .iter()
+            .filter_map(|m| m.doom_time_s)
+            .fold(f64::INFINITY, f64::min);
         if soonest < 1e8 * 3.156e7 {
             wired += 1;
             match p.state {
-                WorldState::Doomed { doom_time_s } => assert_eq!(doom_time_s, soonest, "seed {seed}"),
+                WorldState::Doomed { doom_time_s } => {
+                    assert_eq!(doom_time_s, soonest, "seed {seed}")
+                }
                 other => panic!("seed {seed}: moon doom at {soonest} but state {other:?}"),
             }
         }
         for m in &p.moons {
-            assert!(m.secular.migration_m_per_s < 0.0, "seed {seed}: slow rotator must migrate moons inward");
+            assert!(
+                m.secular.migration_m_per_s < 0.0,
+                "seed {seed}: slow rotator must migrate moons inward"
+            );
         }
     }
-    assert!(wired >= 3, "expected several doomed cases across 300 seeds, got {wired}");
+    assert!(
+        wired >= 3,
+        "expected several doomed cases across 300 seeds, got {wired}"
+    );
 }
 
 #[test]
@@ -172,8 +185,14 @@ fn giant_planets_get_major_moon_families() {
         assert!(p.moons.len() <= 6, "seed {seed}");
         for m in &p.moons {
             let frac = m.mass_kg / p.mass_kg;
-            assert!((1e-5..=3e-4).contains(&frac), "seed {seed}: giant moon mass fraction {frac}");
+            assert!(
+                (1e-5..=3e-4).contains(&frac),
+                "seed {seed}: giant moon mass fraction {frac}"
+            );
         }
     }
-    assert!(with_moons > 150, "giants should almost always have moons, got {with_moons}/200");
+    assert!(
+        with_moons > 150,
+        "giants should almost always have moons, got {with_moons}/200"
+    );
 }

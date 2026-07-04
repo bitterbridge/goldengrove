@@ -35,7 +35,11 @@ pub fn solve_kepler(mean_anomaly_rad: f64, e: f64) -> f64 {
 
 /// Position relative to the focus (parent body) at time t, meters.
 pub fn position_at(el: &OrbitalElements, mu: f64, t_s: f64) -> [f64; 3] {
-    debug_assert!((0.0..1.0).contains(&el.eccentricity), "eccentricity {} outside [0, 1)", el.eccentricity);
+    debug_assert!(
+        (0.0..1.0).contains(&el.eccentricity),
+        "eccentricity {} outside [0, 1)",
+        el.eccentricity
+    );
     let n = TAU / orbital_period_s(el.semi_major_axis_m, mu);
     let m = el.mean_anomaly_epoch_rad + n * t_s;
     let big_e = solve_kepler(m, el.eccentricity);
