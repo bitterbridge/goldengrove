@@ -17,6 +17,15 @@ export interface TileMeshData {
   colors: Float32Array;
   indices: Uint32Array;
   originBf: [number, number, number];
+  /** Number of index entries belonging to grid quads only (excludes the
+   * skirt-wall quads). Used to compute vertex normals from grid faces
+   * alone — skirt walls are near-vertical and would otherwise pollute
+   * border-vertex normals with tangential components (dark seams). */
+  gridIndexCount: number;
+  /** ring[s] = grid vertex index that skirt vertex (gridCount + s) was
+   * duplicated from. Lets the caller copy each skirt vertex's normal from
+   * its source grid vertex after grid-only normals are computed. */
+  skirtSourceIndices: Uint32Array;
 }
 
 export function buildTileMesh(t: TileId, elevationsM: Float32Array, inputs: TileMeshInputs): TileMeshData {
@@ -87,5 +96,8 @@ export function buildTileMesh(t: TileId, elevationsM: Float32Array, inputs: Tile
     o += 6;
   }
 
-  return { positions, colors, indices, originBf };
+  const gridIndexCount = 6 * TILE_QUADS * TILE_QUADS;
+  const skirtSourceIndices = Uint32Array.from(ring);
+
+  return { positions, colors, indices, originBf, gridIndexCount, skirtSourceIndices };
 }

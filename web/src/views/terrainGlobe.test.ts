@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { parseDescriptor } from '../sim/parse';
 import { bodyLayout } from '../sim/layout';
 import type { Sim } from '../sim/wasm';
+import { TILE_QUADS } from './cubeSphere';
 import { buildTerrainGlobe } from './terrainGlobe';
 
 const golden = parseDescriptor(
@@ -30,6 +31,18 @@ function fakeSim(): Sim {
       for (let i = 0; i < out.length; i++) out[i] = 100 * Math.sin(coords[2 * i]! * 0.5); // smooth, lat-dependent
       return out;
     },
+  };
+}
+
+/** Same as fakeSim(), but with perfectly flat (sea-level) elevations
+ * everywhere — isolates normal computation from any relief-driven slope,
+ * so any deviation from radially-outward normals at grid vertices can only
+ * come from skirt-face pollution in computeVertexNormals(). */
+function fakeFlatSim(): Sim {
+  const sim = fakeSim();
+  return {
+    ...sim,
+    bodyElevations: (_: number, coords: Float64Array) => new Float32Array(coords.length / 2),
   };
 }
 
@@ -148,5 +161,36 @@ describe('buildTerrainGlobe', () => {
     expect(fogHigh).toBeLessThan(fogLow / 100);
     g.update(15, 30, 252, suns, 2, 0.0, 1.0);
     expect((g.scene.fog as THREE.FogExp2).density).toBe(0);
+  });
+
+  it('grid vertex normals point outward (no dark seams from skirt-face pollution)', () => {
+    const g = buildTerrainGlobe(fakeFlatSim(), anchorBody)!;
+    for (let f = 0; f < 40; f++) g.update(15, 30, 252, suns, 8);
+
+    let mesh: THREE.Mesh | undefined;
+    g.scene.traverse((o) => {
+      if (!mesh && (o as { isMesh?: boolean }).isMesh && o.visible) mesh = o as THREE.Mesh;
+    });
+    expect(mesh).toBeDefined();
+
+    const originBf = mesh!.userData.originBf as [number, number, number];
+    const positions = mesh!.geometry.getAttribute('position');
+    const normals = mesh!.geometry.getAttribute('normal');
+    expect(normals).toBeDefined();
+
+    const gridCount = (TILE_QUADS + 1) * (TILE_QUADS + 1);
+    let minDot = Infinity;
+    for (let i = 0; i < gridCount; i++) {
+      const px = originBf[0] + positions.getX(i);
+      const py = originBf[1] + positions.getY(i);
+      const pz = originBf[2] + positions.getZ(i);
+      const len = Math.hypot(px, py, pz);
+      const ox = px / len, oy = py / len, oz = pz / len;
+      const nx = normals.getX(i), ny = normals.getY(i), nz = normals.getZ(i);
+      const nlen = Math.hypot(nx, ny, nz);
+      const dot = (nx * ox + ny * oy + nz * oz) / nlen;
+      minDot = Math.min(minDot, dot);
+    }
+    expect(minDot).toBeGreaterThan(0.95);
   });
 });

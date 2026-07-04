@@ -12,9 +12,9 @@ import * as THREE from 'three';
 import { bodyLayout, bodyRadiusM } from '../sim/layout';
 import type { Sim } from '../sim/wasm';
 import type { SunSpec } from './sky';
-import { tileGrid, tileKey, type TileId } from './cubeSphere';
+import { tileGrid, tileKey, type TileId, TILE_QUADS } from './cubeSphere';
 import { TileTree } from './tileTree';
-import { buildTileMesh } from './tileMesh';
+import { buildTileMesh, type TileMeshData } from './tileMesh';
 
 export interface TerrainGlobe {
   scene: THREE.Scene;
@@ -65,6 +65,28 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
   const waterMeshes = new Map<string, THREE.Mesh>();
   let pendingBuilds = 0;
 
+  const GRID_COUNT = (TILE_QUADS + 1) * (TILE_QUADS + 1);
+
+  // Vertex normals must come from grid faces only: computing them over the
+  // full index (grid + vertical skirt-wall quads) averages near-vertical
+  // skirt-face normals into border grid vertices, darkening every tile
+  // edge under directional lighting (visible as a grid of dark seams at
+  // altitude). Skirt vertices don't need their own lighting fidelity —
+  // they're a hidden crack-filler — so they simply inherit their source
+  // grid vertex's normal.
+  function computeGridOnlyNormals(geo: THREE.BufferGeometry, data: TileMeshData): void {
+    const fullIndex = data.indices;
+    geo.setIndex(new THREE.BufferAttribute(fullIndex.subarray(0, data.gridIndexCount), 1));
+    geo.computeVertexNormals();
+    geo.setIndex(new THREE.BufferAttribute(fullIndex, 1));
+    const normal = geo.getAttribute('normal') as THREE.BufferAttribute;
+    data.skirtSourceIndices.forEach((srcGi, s) => {
+      const skirtI = GRID_COUNT + s;
+      normal.setXYZ(skirtI, normal.getX(srcGi), normal.getY(srcGi), normal.getZ(srcGi));
+    });
+    normal.needsUpdate = true;
+  }
+
   function buildTile(t: TileId): void {
     const grid = tileGrid(t);
     const n = grid.lats.length;
@@ -80,7 +102,7 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
     geo.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(data.colors, 3));
     geo.setIndex(new THREE.BufferAttribute(data.indices, 1));
-    geo.computeVertexNormals();
+    computeGridOnlyNormals(geo, data);
     const mesh = new THREE.Mesh(geo, material);
     mesh.userData.originBf = data.originBf;
     mesh.visible = false;
@@ -97,7 +119,7 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
         const wg = new THREE.BufferGeometry();
         wg.setAttribute('position', new THREE.BufferAttribute(w.positions, 3));
         wg.setIndex(new THREE.BufferAttribute(w.indices, 1));
-        wg.computeVertexNormals();
+        computeGridOnlyNormals(wg, w);
         const wm = new THREE.Mesh(wg, waterMaterial);
         wm.userData.originBf = w.originBf;
         wm.visible = false;
