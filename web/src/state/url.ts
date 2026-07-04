@@ -9,10 +9,11 @@ export interface AppState {
   body: number | null;
   lat: number | null;
   lon: number | null;
+  alt: number | null;
 }
 
 export function defaultAppState(seed: string): AppState {
-  return { seed, view: 'space', t: 0, speed: 1, body: null, lat: null, lon: null };
+  return { seed, view: 'space', t: 0, speed: 1, body: null, lat: null, lon: null, alt: null };
 }
 
 function finiteInRange(v: string | null, lo: number, hi: number): number | null {
@@ -37,6 +38,7 @@ export function parseAppState(hash: string): AppState | null {
   if (body !== null && Number.isInteger(body)) s.body = body;
   s.lat = finiteInRange(params.get('lat'), -90, 90);
   s.lon = finiteInRange(params.get('lon'), -180, 180);
+  s.alt = finiteInRange(params.get('alt'), 0, 1e10);
   return s;
 }
 
@@ -48,7 +50,8 @@ export function serializeAppState(s: AppState): string {
   if (t !== 0) parts.push(`t=${t}`);
   if (s.speed !== 1) parts.push(`speed=${s.speed}`);
   if (s.body !== null) parts.push(`body=${s.body}`);
-  if (s.lat !== null) parts.push(`lat=${s.lat.toFixed(2).replace(/\.?0+$/, '')}`);
-  if (s.lon !== null) parts.push(`lon=${s.lon.toFixed(2).replace(/\.?0+$/, '')}`);
+  if (s.lat !== null) parts.push(`lat=${s.lat.toFixed(4).replace(/\.?0+$/, '')}`);
+  if (s.lon !== null) parts.push(`lon=${s.lon.toFixed(4).replace(/\.?0+$/, '')}`);
+  if (s.alt !== null && s.alt > 0) parts.push(`alt=${Math.round(s.alt)}`);
   return `#${parts.join('&')}`;
 }
