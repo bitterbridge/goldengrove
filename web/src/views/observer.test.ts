@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseDescriptor } from '../sim/parse';
 import { bodyLayout } from '../sim/layout';
-import { observerFrame, planetBasis, pointToLatLon, skyBodies, type Vec3 } from './observer';
+import { observerFrame, planetBasis, pointToLatLon, skyBodies, sunSpecs, type Vec3 } from './observer';
 
 const golden = parseDescriptor(
   readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../crates/gg-gen/tests/golden/seed-42.json'), 'utf8'),
@@ -108,6 +108,23 @@ describe('skyBodies', () => {
     const f = observerFrame(states, golden, anchorBody, 15, 0);
     for (const b of skyBodies(states, golden, anchorBody, f)) {
       expect(Number.isFinite(b.altRad) && Number.isFinite(b.azRad) && Number.isFinite(b.angularRadiusRad)).toBe(true);
+    }
+  });
+});
+
+describe('sunSpecs', () => {
+  it('brightest sun first, normalized irradiance, ENU direction', () => {
+    const layout = bodyLayout(golden);
+    const n = layout.length;
+    const states = new Float64Array(n * 7);
+    for (let i = 0; i < n; i++) { states[i * 7] = (i + 1) * 1e10; states[i * 7 + 5] = 1; }
+    const anchorBody = golden.stars.length + golden.anchor_planet;
+    const f = observerFrame(states, golden, anchorBody, 15, 0);
+    const suns = sunSpecs(states, golden, anchorBody, f);
+    expect(suns.length).toBe(golden.stars.length);
+    expect(suns[0]!.irradiance).toBe(1);
+    for (const s of suns) {
+      expect(Math.hypot(...s.dirLocal)).toBeCloseTo(1, 9);
     }
   });
 });

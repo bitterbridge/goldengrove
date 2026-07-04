@@ -1,5 +1,6 @@
 import { bodyLayout, bodyRadiusM, type BodyRef } from '../sim/layout';
 import type { SystemDescriptor } from '../sim/types';
+import type { SunSpec } from './sky';
 
 export type Vec3 = [number, number, number];
 
@@ -104,6 +105,31 @@ export function skyBodies(
     out.push({ index: i, kind: ref.kind, dirLocal, altRad, azRad, distM, angularRadiusRad });
   });
   return out;
+}
+
+/** Suns visible from the observer: irradiance = luminosity/d², normalized to
+ * the brightest (irradiance 1), sorted brightest-first, with ENU dirLocal. */
+export function sunSpecs(
+  states: Float64Array,
+  desc: SystemDescriptor,
+  standingIndex: number,
+  frame: ObserverFrame,
+): SunSpec[] {
+  const layout = bodyLayout(desc);
+  const visible = skyBodies(states, desc, standingIndex, frame);
+  const suns: SunSpec[] = [];
+  let maxIrr = 0;
+  for (const b of visible) {
+    const ref = layout[b.index]!;
+    if (ref.kind !== 'star') continue;
+    const st = desc.stars[ref.star]!;
+    const irr = st.luminosity_w / (b.distM * b.distM);
+    maxIrr = Math.max(maxIrr, irr);
+    suns.push({ dirLocal: b.dirLocal, temperatureK: st.temperature_k, irradiance: irr });
+  }
+  suns.forEach((s) => { s.irradiance = maxIrr > 0 ? s.irradiance / maxIrr : 0; });
+  suns.sort((a, b) => b.irradiance - a.irradiance);
+  return suns;
 }
 
 /** Inverse of the surface-point construction: world-frame unit direction from

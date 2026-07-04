@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { atmosphereDensityFor, bodyLayout, bodyName, isTidallyLocked } from '../sim/layout';
 import type { Sim } from '../sim/wasm';
-import { observerFrame, skyBodies, type SkyBody } from './observer';
+import { observerFrame, skyBodies, sunSpecs, type SkyBody } from './observer';
 import { buildSkyDome, type SunSpec } from './sky';
 import { buildStarfield } from './starfield';
 import { temperatureToColor } from './color';
@@ -110,18 +110,7 @@ export function buildGroundScene(sim: Sim): GroundView {
     });
 
     const byIndex = new Map(visible.map((b) => [b.index, b]));
-    const suns: SunSpec[] = [];
-    let maxIrr = 0;
-    for (const b of visible) {
-      const ref = layout[b.index]!;
-      if (ref.kind !== 'star') continue;
-      const st = desc.stars[ref.star]!;
-      const irr = st.luminosity_w / (b.distM * b.distM);
-      maxIrr = Math.max(maxIrr, irr);
-      suns.push({ dirLocal: b.dirLocal, temperatureK: st.temperature_k, irradiance: irr });
-    }
-    suns.forEach((s) => { s.irradiance = maxIrr > 0 ? s.irradiance / maxIrr : 0; });
-    suns.sort((a, b) => b.irradiance - a.irradiance);
+    const suns = sunSpecs(states, desc, standing.body, frame);
     sky.setSuns(suns);
     // Karman-line falloff: same scale height (H = 8500 m) as terrain fog.
     sky.setDensity(atmosphereDensityFor(desc, layout[standing.body]!) * Math.exp(-altitudeM / 8500));
