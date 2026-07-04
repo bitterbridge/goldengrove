@@ -50,40 +50,53 @@ export class TileTree {
       }
     }
 
-    // 2. render set: nearest built ancestor per desired tile (deduped);
-    //    3. build list: every unbuilt ancestor-chain tile, coarse-first.
-    const render = new Map<string, TileId>();
+    // 2. build list: every unbuilt ancestor-chain tile per desired leaf,
+    //    coarse-first, deduped keeping the nearest requesting distance.
     const wanted = new Map<string, { t: TileId; d: number }>();
     for (const { t, d } of desired) {
       let cur: TileId | null = t;
-      const chain: TileId[] = [];
-      let shown: TileId | null = null;
       while (cur) {
         const k = tileKey(cur);
-        if (this.built.has(k)) { shown = cur; break; }
-        chain.push(cur);
-        cur = parent(cur);
-      }
-      if (shown) {
-        const k = tileKey(shown);
-        render.set(k, shown);
-        this.built.set(k, this.stamp);
-      }
-      for (const c of chain) {
-        const k = tileKey(c);
+        if (this.built.has(k)) break;
         const prev = wanted.get(k);
-        if (!prev || d < prev.d) wanted.set(k, { t: c, d });
+        if (!prev || d < prev.d) wanted.set(k, { t: cur, d });
+        cur = parent(cur);
       }
     }
     const build = [...wanted.values()]
       .sort((a, b) => a.t.level - b.t.level || a.d - b.d)
       .map((w) => w.t);
 
+    // 3. render set: top-down cut mirroring the split predicate above. A
+    //    tile's subtree is only entered when EVERY child subtree is fully
+    //    coverable by built tiles; otherwise the tile itself renders (if
+    //    built) and nothing beneath it does. This guarantees single
+    //    coverage — no rendered tile is ever an ancestor of another
+    //    rendered tile, even while builds are still streaming in.
+    const cut = (t: TileId): TileId[] | null => {
+      const d = this.dist(cameraBf, t);
+      const splits = t.level < this.deepest && d < this.cfg.splitK * tileEdgeLenM(t.level, this.cfg.radiusM);
+      if (splits) {
+        const kidCuts = children(t).map(cut);
+        if (kidCuts.every((c): c is TileId[] => c !== null)) return kidCuts.flat();
+      }
+      const k = tileKey(t);
+      if (!this.built.has(k)) return null;
+      this.built.set(k, this.stamp);
+      return [t];
+    };
+    const render: TileId[] = [];
+    for (let f = 0; f < 6; f++) {
+      const r = cut({ face: f, level: 0, ix: 0, iy: 0 });
+      if (r) render.push(...r);
+    }
+
     // 4. eviction: oldest built keys beyond cap, never currently rendered
+    const renderKeys = new Set(render.map(tileKey));
     const evict: string[] = [];
     if (this.built.size > this.cfg.cacheCap) {
       const candidates = [...this.built.entries()]
-        .filter(([k]) => !render.has(k))
+        .filter(([k]) => !renderKeys.has(k))
         .sort((a, b) => a[1] - b[1]);
       const excess = this.built.size - this.cfg.cacheCap;
       for (const [k] of candidates.slice(0, excess)) {
@@ -92,6 +105,6 @@ export class TileTree {
       }
     }
 
-    return { render: [...render.values()], build, evict };
+    return { render, build, evict };
   }
 }
