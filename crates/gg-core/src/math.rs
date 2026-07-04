@@ -33,3 +33,13 @@ pub fn cbrt(x: f64) -> f64 {
 pub fn cos(x: f64) -> f64 {
     libm::cos(x)
 }
+
+#[inline]
+pub fn sin(x: f64) -> f64 {
+    libm::sin(x)
+}
+
+#[inline]
+pub fn acos(x: f64) -> f64 {
+    libm::acos(x)
+}

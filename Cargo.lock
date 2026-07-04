@@ -105,6 +105,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gg-terrain"
+version = "0.1.0"
+dependencies = [
+ "gg-core",
+ "gg-gen",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "gg-wasm"
 version = "0.1.0"
 dependencies = [
