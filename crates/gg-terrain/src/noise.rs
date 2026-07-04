@@ -82,12 +82,30 @@ pub fn warped_fbm(seed: u64, p: V3, octaves: u32) -> f64 {
 /// more energy into the walking-scale band without increasing the total
 /// octave-sum enough to threaten the coarse/fine seam budget (measured
 /// worst-case seam ~0.11 of the 0.20 budget). Libm-free.
-pub fn micro(seed: u64, p: V3) -> f64 {
+///
+/// `p` is a point on the *unit* sphere, so the octave frequencies above are
+/// angular (per-radian): the same `p`-space octave always spans the same
+/// angular wavelength, and physical wavelength-in-meters was `angular
+/// wavelength * body radius`. That silently scaled every octave's physical
+/// size with body radius. On an Earth-radius body (the seed-42 anchor
+/// planet, R≈R_EARTH, is what the retune above was tuned against) the
+/// wavelengths land at the intended ~50 km-to-45 m walking scale. On a
+/// small moon (radius ~1/9 R_EARTH) the same angular octaves compress to
+/// physical wavelengths ~1/9 as large — the finest octave collapsed to a
+/// ~10 m wavelength with ~15 m amplitude, a 150%+ slope spike field that
+/// rendered as sky-filling triangle spikes at the observer's feet.
+///
+/// `radius_scale` (= body radius / R_EARTH, dimensionless) corrects this by
+/// scaling the starting frequency so physical wavelength-in-meters —
+/// `R_EARTH / (F0 * 1.9^k)` — is identical on every body regardless of its
+/// own radius: a 52 km finest-to-coarsest octave on Earth is also 52 km on
+/// a 700 km moon. Amplitudes are untouched by this parameter.
+pub fn micro(seed: u64, p: V3, radius_scale: f64) -> f64 {
     const A0: f64 = 0.07;
     const F0: f64 = 2.6 * 47.045_880_999_999_99; // 2.6 * 1.9^6 (unchanged)
     let mut sum = 0.0;
     let mut amp = A0;
-    let mut freq = F0;
+    let mut freq = F0 * radius_scale;
     for k in 0..12u64 {
         sum += amp
             * value_noise(

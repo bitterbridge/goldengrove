@@ -297,6 +297,7 @@ pub struct TerrainSpec {
     sea_level: f64,
     ocean_fraction: f64,
     relief_m: f64,
+    radius_m: f64,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -354,6 +355,7 @@ impl TerrainSpec {
             sea_level,
             ocean_fraction,
             relief_m,
+            radius_m: facts.radius_m,
         })
     }
 
@@ -376,7 +378,8 @@ impl TerrainSpec {
         // trenches), calm on plains and shelves. Continuous by construction:
         // abs/min of continuous inputs, no positional branches.
         let mask = 0.25 + 0.75 * (base.abs() / 0.8).min(1.0);
-        (base + mask * noise::micro(self.raw.noise_seed, p)) * self.relief_m
+        (base + mask * noise::micro(self.raw.noise_seed, p, self.radius_m / R_EARTH))
+            * self.relief_m
     }
 
     /// Batched elevation_fine: coords is [lat0, lon0, lat1, lon1, ...] in

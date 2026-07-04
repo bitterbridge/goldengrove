@@ -198,7 +198,7 @@ fn micro_detail_is_small_and_continuous() {
     for i in 0..20_000 {
         let t = i as f64 * 1e-5;
         let p = gg_terrain::sphere::latlon_to_unit(12.0 + t * 57.2957795, 40.0);
-        let m = gg_terrain::noise::micro(0xDEADBEEF, p);
+        let m = gg_terrain::noise::micro(0xDEADBEEF, p, 1.0);
         worst_val = worst_val.max(m.abs());
         if let Some(pv) = prev {
             worst_jump = worst_jump.max((m - pv).abs());
@@ -242,6 +242,72 @@ fn fine_terrain_has_walking_scale_relief() {
     let rms = (sq_sum / n as f64).sqrt();
     assert!(rms > 0.02, "terrain is glassy: RMS 1km slope {rms}");
     assert!(rms < 0.60, "terrain is spiky noise: RMS 1km slope {rms}");
+}
+
+/// Find a moon's radius on the given descriptor by ephemeris body order
+/// (mirrors `gg_terrain`'s private `body_facts` resolution, radius-only).
+fn moon_radius_m(desc: &gg_gen::descriptor::SystemDescriptor, body_index: usize) -> Option<f64> {
+    let stars = desc.stars.len();
+    let planets = desc.planets.len();
+    if body_index < stars + planets {
+        return None;
+    }
+    let mut m = body_index - stars - planets;
+    for p in &desc.planets {
+        if m < p.moons.len() {
+            return Some(p.moons[m].radius_m);
+        }
+        m -= p.moons.len();
+    }
+    None
+}
+
+#[test]
+fn small_body_fine_terrain_is_not_spiky() {
+    // Regression for the angular-frequency defect: `micro()`'s octave
+    // frequencies were per-radian, so wavelengths scaled with body radius.
+    // On small moons the finest octaves collapsed to a few-meter physical
+    // wavelength with double-digit-meter amplitude — a 150%+ slope spike
+    // field that renders as sky-filling triangle spikes at the observer's
+    // feet. Earth-radius bodies were fine; small bodies were shattered.
+    //
+    // Sample RMS slope on the smallest moon under 3,000 km radius on seed
+    // 42 (radius ~739 km — the smallest such body qualifies as the worst
+    // case, since smaller radius means shorter physical wavelength for the
+    // same fixed angular frequency). 100 m sampling (matching
+    // `fine_terrain_has_walking_scale_relief`'s technique) undersamples the
+    // ~10 m defect wavelength badly enough to average it out, so this uses
+    // 20 m sampling instead to stay inside the spike band.
+    let desc = generate(42);
+    let stars = desc.stars.len();
+    let planets = desc.planets.len();
+    let total = stars + planets + desc.planets.iter().map(|p| p.moons.len()).sum::<usize>();
+    let (body, radius) = (0..total)
+        .filter_map(|b| {
+            moon_radius_m(&desc, b)
+                .filter(|r| *r < 3.0e6)
+                .map(|r| (b, r))
+        })
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .expect("seed 42 must have a moon under 3,000 km radius");
+    let spec = TerrainSpec::for_body(42, &desc, body).unwrap();
+    const STEP_M: f64 = 20.0;
+    let step_deg = (STEP_M / radius).to_degrees();
+    let mut sq_sum = 0.0;
+    let n = 2000;
+    for i in 0..n {
+        let lat = -60.0 + 120.0 * (i as f64) / (n as f64);
+        let lon = -170.0 + 340.0 * (i as f64 * 0.618_033_988_75).fract();
+        let e0 = spec.elevation_fine(lat, lon);
+        let e1 = spec.elevation_fine(lat + step_deg, lon);
+        let slope = (e1 - e0) / STEP_M;
+        sq_sum += slope * slope;
+    }
+    let rms = (sq_sum / n as f64).sqrt();
+    assert!(
+        rms < 0.8,
+        "body {body} (radius {radius:.0} m): RMS {STEP_M}m slope {rms} — small-moon spike field"
+    );
 }
 
 #[test]
