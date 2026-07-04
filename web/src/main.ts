@@ -110,7 +110,15 @@ async function boot(): Promise<void> {
     }
   }
 
+  function hideAllLabels(): void {
+    // The shared CSS2DRenderer only refreshes labels of the scene it renders;
+    // hide everything on a view switch so the inactive view's labels can't
+    // linger — the active scene re-shows its own on the next frame.
+    document.querySelectorAll<HTMLElement>('.body-label').forEach((el) => { el.style.display = 'none'; });
+  }
+
   function enterGround(body: number, latDeg: number, lonDeg: number): void {
+    hideAllLabels();
     if (!standableBody(sim.descriptor, layout[body]!)) return;
     current.view = 'ground';
     current.body = body;
@@ -120,10 +128,14 @@ async function boot(): Promise<void> {
     yaw = 0;
     pitch = 0.15;
     refreshViewButton();
+    if (clock.speed > 3600) { clock.speed = 3600; hud.setActiveSpeed(3600); }
+    hud.setMaxSpeed(3600);
   }
   function exitGround(): void {
+    hideAllLabels();
     current.view = 'space';
     refreshViewButton();
+    hud.setMaxSpeed(null);
   }
 
   function resize(): void {

@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { atmosphereDensityFor, bodyLayout, bodyName, bodyRadiusM, parentIndex, standableBody } from './layout';
+import { atmosphereDensityFor, bodyLayout, bodyName, bodyRadiusM, isTidallyLocked, parentIndex, standableBody } from './layout';
 import { parseDescriptor } from './parse';
 
 const goldenPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../crates/gg-gen/tests/golden/seed-42.json');
@@ -56,5 +56,20 @@ describe('body metadata helpers', () => {
     expect(d).toBe(golden.planets[rocky]!.state.kind === 'Dead' ? 0.05 : 1.0);
     const pi = golden.planets.findIndex((p) => p.moons.length > 0);
     expect(atmosphereDensityFor(golden, { kind: 'moon', planet: pi, moon: 0 })).toBe(0.05);
+  });
+  it('tidal lock: true only for moons flagged locked in the descriptor', () => {
+    const allMoons = golden.planets.flatMap((p, pi) =>
+      p.moons.map((m, mi) => ({ pi, mi, locked: m.tidally_locked })),
+    );
+    const locked = allMoons.find((x) => x.locked)!;
+    expect(locked).toBeTruthy();
+    expect(isTidallyLocked(golden, { kind: 'moon', planet: locked.pi, moon: locked.mi })).toBe(true);
+
+    const unlocked = allMoons.find((x) => !x.locked);
+    if (unlocked) {
+      expect(isTidallyLocked(golden, { kind: 'moon', planet: unlocked.pi, moon: unlocked.mi })).toBe(false);
+    }
+    expect(isTidallyLocked(golden, { kind: 'planet', planet: 0 })).toBe(false);
+    expect(isTidallyLocked(golden, { kind: 'star', star: 0 })).toBe(false);
   });
 });

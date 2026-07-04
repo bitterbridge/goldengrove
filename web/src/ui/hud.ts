@@ -34,6 +34,7 @@ export interface Hud {
   flashShared(): void;
   setActiveSpeed(mult: number): void;
   setViewButton(label: string, visible: boolean): void;
+  setMaxSpeed(maxMult: number | null): void;
 }
 
 export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud {
@@ -107,6 +108,11 @@ export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud
     setViewButton: (label, visible) => {
       viewToggle.textContent = label;
       viewToggle.style.display = visible ? '' : 'none';
+    },
+    setMaxSpeed: (maxMult) => {
+      speedButtons.forEach((b, i) => {
+        b.disabled = maxMult !== null && SPEED_STEPS[i]!.mult > maxMult;
+      });
     },
   };
   hud.setActiveSpeed(1);

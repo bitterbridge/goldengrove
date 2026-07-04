@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { atmosphereDensityFor, bodyLayout, bodyName } from '../sim/layout';
+import { atmosphereDensityFor, bodyLayout, bodyName, isTidallyLocked } from '../sim/layout';
 import type { Sim } from '../sim/wasm';
 import { observerFrame, skyBodies, type SkyBody } from './observer';
 import { buildSkyDome, type SunSpec } from './sky';
@@ -69,6 +69,10 @@ export function buildGroundScene(sim: Sim): GroundView {
     const div = document.createElement('div');
     div.className = 'body-label';
     div.textContent = bodyName(desc, i);
+    if (isTidallyLocked(desc, ref)) {
+      div.textContent += ' 🔒';
+      div.title = 'tidally locked';
+    }
     const label = new CSS2DObject(div);
     mesh.add(label);
     bodies.push(mesh);
@@ -141,6 +145,10 @@ export function buildGroundScene(sim: Sim): GroundView {
       mesh.position.set(b.dirLocal[0] * d, b.dirLocal[1] * d, b.dirLocal[2] * d);
       const apparent = b.kind === 'planet' ? Math.max(b.angularRadiusRad, MIN_APPARENT_RAD) : b.angularRadiusRad;
       mesh.scale.setScalar(Math.max(d * Math.tan(apparent), 0.05));
+      const axis = new THREE.Vector3(states[i * 7 + 3]!, states[i * 7 + 4]!, states[i * 7 + 5]!);
+      if (axis.lengthSq() > 1e-12) {
+        mesh.setRotationFromAxisAngle(axis.normalize(), states[i * 7 + 6]!);
+      }
     });
 
     const day = sky.dayFactor();

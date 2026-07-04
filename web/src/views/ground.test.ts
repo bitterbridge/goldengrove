@@ -43,6 +43,8 @@ describe('buildGroundScene', () => {
     expect(g.scene.getObjectByName('starfield')).toBeTruthy();
     expect(g.scene.getObjectByName('skydome')).toBeTruthy();
     expect(g.scene.getObjectByName('ground-disc')).toBeTruthy();
+    // golden seed-42 has tidally locked moons: at least one label carries the lock badge
+    expect(g.labels.some((l) => (l.element as HTMLElement).textContent?.endsWith('🔒'))).toBe(true);
   });
 
   it('update() places bodies on the 850-950 dome, ranked by true distance', () => {
@@ -67,6 +69,29 @@ describe('buildGroundScene', () => {
     expect(lights.length).toBeGreaterThanOrEqual(1);
     expect(g.dayFactor()).toBeGreaterThanOrEqual(0);
     expect(g.dayFactor()).toBeLessThanOrEqual(1);
+  });
+
+  it('applies body rotation from the axis+angle state slots', () => {
+    const sim = fakeSim();
+    const g = buildGroundScene(sim);
+    const states = sim.statesAt(0);
+    g.update(states, { body: anchorBody, latDeg: 15, lonDeg: 0 });
+
+    // mesh index === body index (bodies are pushed in layout order); pick a
+    // visible one the same way the dome-placement test identifies visibility.
+    const visible = g.bodies.findIndex((m) => m.position.length() > 0);
+    expect(visible).toBeGreaterThanOrEqual(0);
+    const mesh = g.bodies[visible]!;
+
+    // rotation angle 0 on the first call -> identity-ish quaternion
+    expect(mesh.quaternion.angleTo(new THREE.Quaternion())).toBeLessThan(1e-9);
+    const beforeQuat = mesh.quaternion.clone();
+
+    const rotated = states.slice();
+    rotated[visible * 7 + 6] = 1.0; // advance this body's rotation angle
+    g.update(rotated, { body: anchorBody, latDeg: 15, lonDeg: 0 });
+
+    expect(mesh.quaternion.equals(beforeQuat)).toBe(false);
   });
 
   it('labels hide below the horizon', () => {

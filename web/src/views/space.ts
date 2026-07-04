@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { bodyLayout, bodyName, bodyRadiusM, parentIndex, type BodyRef } from '../sim/layout';
+import { bodyLayout, bodyName, bodyRadiusM, isTidallyLocked, parentIndex, type BodyRef } from '../sim/layout';
 import type { Sim } from '../sim/wasm';
 import { compressPosition, displayRadius, moonViewFactor } from './compression';
 import { temperatureToColor } from './color';
@@ -61,6 +61,10 @@ export function buildSpaceScene(sim: Sim): SpaceView {
     const div = document.createElement('div');
     div.className = 'body-label';
     div.textContent = bodyName(sim.descriptor, i);
+    if (isTidallyLocked(sim.descriptor, ref)) {
+      div.textContent += ' 🔒';
+      div.title = 'tidally locked';
+    }
     const label = new CSS2DObject(div);
     mesh.add(label);
     labels.push(label);

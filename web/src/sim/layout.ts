@@ -51,6 +51,11 @@ export function standableBody(desc: SystemDescriptor, ref: BodyRef): boolean {
   return ref.kind === 'planet' && desc.planets[ref.planet]!.class === 'Rocky';
 }
 
+/** True for moons flagged tidally locked in the descriptor. */
+export function isTidallyLocked(desc: SystemDescriptor, ref: BodyRef): boolean {
+  return ref.kind === 'moon' && desc.planets[ref.planet]!.moons[ref.moon]!.tidally_locked;
+}
+
 /** Sky-shader density. Dead worlds lost their air; moons never had much. */
 export function atmosphereDensityFor(desc: SystemDescriptor, ref: BodyRef): number {
   if (ref.kind === 'moon') return 0.05;

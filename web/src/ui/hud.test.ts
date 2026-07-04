@@ -51,6 +51,20 @@ describe('buildHud interactions', () => {
     expect(active[0]!.textContent).toBe(SPEED_STEPS.find((s) => s.mult === 86400)!.label);
   });
 
+  it('setMaxSpeed disables steps above the cap; null re-enables all', () => {
+    const root = document.createElement('div');
+    const hud = buildHud(root, '42', noop);
+    const speedButtons = [...root.querySelectorAll('.hud-bottom button')].slice(1) as HTMLButtonElement[]; // drop play/pause
+
+    hud.setMaxSpeed(3600);
+    const expectedDisabled = SPEED_STEPS.filter((s) => s.mult > 3600).length;
+    expect(speedButtons.filter((b) => b.disabled).length).toBe(expectedDisabled);
+    SPEED_STEPS.forEach((s, i) => { expect(speedButtons[i]!.disabled).toBe(s.mult > 3600); });
+
+    hud.setMaxSpeed(null);
+    expect(speedButtons.every((b) => !b.disabled)).toBe(true);
+  });
+
   it('view-toggle button is controllable', () => {
     const root = document.createElement('div');
     let toggles = 0;
