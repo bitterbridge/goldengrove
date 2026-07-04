@@ -8,6 +8,7 @@ import { buildGroundScene, type GroundView } from './views/ground';
 import { pointToLatLon, type Vec3 } from './views/observer';
 import { bodyLayout, standableBody } from './sim/layout';
 import { buildHud, formatDate } from './ui/hud';
+import { buildCompass } from './ui/compass';
 import { randomSeed } from './ui/seed';
 import { defaultAppState, parseAppState, serializeAppState, type AppState } from './state/url';
 import { timeAtDate } from './sim/calendar';
@@ -100,6 +101,7 @@ async function boot(): Promise<void> {
   });
   hud.setActiveSpeed(clock.speed);
   hud.setPaused(clock.paused);
+  const compass = buildCompass(app);
 
   function refreshViewButton(): void {
     if (current.view === 'ground') {
@@ -128,11 +130,13 @@ async function boot(): Promise<void> {
     yaw = 0;
     pitch = 0.15;
     refreshViewButton();
+    compass.setVisible(true);
     if (clock.speed > 3600) { clock.speed = 3600; hud.setActiveSpeed(3600); }
     hud.setMaxSpeed(3600);
   }
   function exitGround(): void {
     hideAllLabels();
+    compass.setVisible(false);
     current.view = 'space';
     refreshViewButton();
     hud.setMaxSpeed(null);
@@ -162,6 +166,7 @@ async function boot(): Promise<void> {
     if (current.view !== 'ground' || !dragging) return;
     yaw -= e.movementX * 0.0032;
     pitch = Math.min(Math.PI / 2 - 0.01, Math.max(-0.45, pitch + e.movementY * 0.0032));
+    compass.setHeading(yaw, pitch);
   });
   renderer.domElement.addEventListener('pointerup', (e) => {
     if (current.view !== 'space') return;
@@ -224,6 +229,7 @@ async function boot(): Promise<void> {
       if (now - lastDateUpdate > 250) {
         lastDateUpdate = now;
         hud.setDate(formatDate(sim.anchorDate(clock.t), anchorCal));
+        compass.setHeading(yaw, pitch);
       }
       renderer.render(ground.scene, groundCamera);
       labelRenderer.render(ground.scene, groundCamera);
