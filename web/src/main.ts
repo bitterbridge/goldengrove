@@ -220,7 +220,7 @@ async function boot(): Promise<void> {
     if (current.view !== 'ground' || !dragging) return;
     yaw -= e.movementX * 0.0032;
     pitch = Math.min(Math.PI / 2 - 0.01, Math.max(-0.45, pitch + e.movementY * 0.0032));
-    compass.setHeading(yaw, pitch, { latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 });
+    compass.setHeading(yaw, pitch, { latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 }, currentElevationM, flightAltM);
   });
   renderer.domElement.addEventListener('pointerup', (e) => {
     if (current.view !== 'space') return;
@@ -343,7 +343,7 @@ async function boot(): Promise<void> {
       if (now - lastDateUpdate > 250) {
         lastDateUpdate = now;
         hud.setDate(formatDate(sim.anchorDate(clock.t), anchorCal));
-        compass.setHeading(yaw, pitch, { latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 });
+        compass.setHeading(yaw, pitch, { latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 }, currentElevationM, flightAltM);
       }
       renderer.render(ground.scene, groundCamera);
       if (terrainGlobe) {

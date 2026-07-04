@@ -1,6 +1,6 @@
 /** Sliding heading tape for the ground view. Azimuth 0 = north, +east. */
 export interface Compass {
-  setHeading(yawRad: number, pitchRad: number, latLon?: { latDeg: number; lonDeg: number }): void;
+  setHeading(yawRad: number, pitchRad: number, latLon?: { latDeg: number; lonDeg: number }, elevM?: number | null, flightAltM?: number): void;
   setVisible(v: boolean): void;
 }
 
@@ -36,7 +36,7 @@ export function buildCompass(root: HTMLElement): Compass {
   root.appendChild(box);
 
   return {
-    setHeading(yawRad, pitchRad, latLon) {
+    setHeading(yawRad, pitchRad, latLon, elevM, flightAltM) {
       const deg = ((yawRad * 180) / Math.PI % 360 + 360) % 360;
       // window is 288px wide at 1.2 px/deg: displays a 240deg span
       tape.style.transform = `translateX(${-(deg + 360) * PX_PER_DEG + 144}px)`;
@@ -51,6 +51,12 @@ export function buildCompass(root: HTMLElement): Compass {
         // 3 decimals ≈ 111 m per tick — anything coarser and true-scale
         // walking produces no visible change on any readout
         text += ` · ${Math.abs(latLon.latDeg).toFixed(3)}°${ns} ${Math.abs(latLon.lonDeg).toFixed(3)}°${ew}`;
+      }
+      if (elevM !== null && elevM !== undefined) {
+        text += ` · ⛰ ${Math.round(elevM).toLocaleString('en-US')} m`;
+      }
+      if (flightAltM && flightAltM > 0) {
+        text += flightAltM >= 10_000 ? ` · ✈ ${(flightAltM / 1000).toFixed(1)} km` : ` · ✈ ${Math.round(flightAltM)} m`;
       }
       readout.textContent = text;
     },
