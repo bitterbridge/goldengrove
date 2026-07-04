@@ -15,8 +15,9 @@ export interface GroundView {
   scene: THREE.Scene;
   bodies: THREE.Mesh[];
   labels: CSS2DObject[];
-  update(states: Float64Array, standing: Standing): void;
+  update(states: Float64Array, standing: Standing): SunSpec[];
   dayFactor(): number;
+  setDiscVisible(v: boolean): void;
 }
 
 const DOME_NEAR = 850;
@@ -84,7 +85,11 @@ export function buildGroundScene(sim: Sim): GroundView {
   const starQuat = new THREE.Quaternion();
   const basis = new THREE.Matrix4();
 
-  function update(states: Float64Array, standing: Standing): void {
+  function setDiscVisible(v: boolean): void {
+    ground.visible = v;
+  }
+
+  function update(states: Float64Array, standing: Standing): SunSpec[] {
     const frame = observerFrame(states, desc, standing.body, standing.latDeg, standing.lonDeg);
     const visible: SkyBody[] = skyBodies(states, desc, standing.body, frame);
 
@@ -157,7 +162,8 @@ export function buildGroundScene(sim: Sim): GroundView {
 
     const day = sky.dayFactor();
     groundMat.color.setHex(0x14100c).lerp(new THREE.Color(0x6a5a48), day);
+    return suns;
   }
 
-  return { scene, bodies, labels, update, dayFactor: () => sky.dayFactor() };
+  return { scene, bodies, labels, update, dayFactor: () => sky.dayFactor(), setDiscVisible };
 }

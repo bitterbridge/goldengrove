@@ -30,7 +30,7 @@ function fakeSim(): Sim {
     anchorDate: () => ({ year: 0, day_of_year: 0, day_fraction: 0 }),
     hostOriginAt: () => new Float64Array(3),
     bodyHeightmap: () => new Float32Array(0),
-    bodyTerrainInfo: () => null,
+    bodyTerrainInfo: (i) => (i === 0 ? null : { sea_level: 0, ocean_fraction: 0.4, relief_m: 6000, plate_count: 8 }),
     bodyElevation: () => 0,
     bodyElevations: (_: number, coords: Float64Array) => new Float32Array(coords.length / 2),
   };
@@ -121,5 +121,23 @@ describe('buildGroundScene', () => {
     const anyHidden = g.labels.some((l) => l.visible === false);
     const anyShown = g.labels.some((l) => l.visible === true);
     expect(anyHidden || anyShown).toBe(true); // structural: visibility is being managed
+  });
+
+  it('setDiscVisible hides the fallback disc (terrain pass replaces it)', () => {
+    const sim = fakeSim();
+    const g = buildGroundScene(sim);
+    const disc = g.scene.getObjectByName('ground-disc')!;
+    expect(disc.visible).toBe(true);
+    g.setDiscVisible(false);
+    expect(disc.visible).toBe(false);
+  });
+
+  it('update returns the suns it computed for the terrain pass', () => {
+    const sim = fakeSim();
+    const g = buildGroundScene(sim);
+    const suns = g.update(sim.statesAt(0), { body: anchorBody, latDeg: 0, lonDeg: 180 });
+    expect(Array.isArray(suns)).toBe(true);
+    expect(suns.length).toBeGreaterThanOrEqual(1);
+    expect(suns[0]!.irradiance).toBe(1); // normalized, brightest first
   });
 });

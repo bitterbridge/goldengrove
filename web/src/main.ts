@@ -5,9 +5,10 @@ import { loadSim, WasmLoadError, type Sim } from './sim/wasm';
 import { SimClock } from './time/clock';
 import { buildSpaceScene, type SpaceView } from './views/space';
 import { buildGroundScene, type GroundView } from './views/ground';
+import { buildTerrainGlobe, type TerrainGlobe } from './views/terrainGlobe';
 import { pointToLatLon, type Vec3 } from './views/observer';
 import { stepLatLon } from './views/walk';
-import { bodyLayout, parentIndex, standableBody } from './sim/layout';
+import { bodyLayout, bodyRadiusM, parentIndex, standableBody } from './sim/layout';
 import { buildHud, formatDate } from './ui/hud';
 import { buildCompass } from './ui/compass';
 import { randomSeed } from './ui/seed';
@@ -51,7 +52,7 @@ async function boot(): Promise<void> {
   const layout = bodyLayout(sim.descriptor);
   const anchorBody = sim.descriptor.stars.length + sim.descriptor.anchor_planet;
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   const labelRenderer = new CSS2DRenderer();
   labelRenderer.domElement.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
@@ -65,11 +66,30 @@ async function boot(): Promise<void> {
   const view: SpaceView = buildSpaceScene(sim);
 
   // --- ground view ---
-  const groundCamera = new THREE.PerspectiveCamera(60, 1, 0.1, 5000);
+  const groundCamera = new THREE.PerspectiveCamera(60, 1, 0.3, 5e7);
   groundCamera.up.set(0, 0, 1);
   let yaw = 0; // 0 = north (+Y), positive east
   let pitch = 0.15;
   const ground: GroundView = buildGroundScene(sim);
+
+  // The ground scene is built once at boot, but the standing body can change
+  // at runtime (stand-here on another body) — main.ts owns the terrain globe
+  // lifecycle and rebuilds it whenever the standing body changes.
+  let terrainGlobe: TerrainGlobe | null = null;
+  function setStandingGlobe(body: number | null): void {
+    terrainGlobe = body !== null ? buildTerrainGlobe(sim, body) : null;
+    ground.setDiscVisible(terrainGlobe === null);
+  }
+
+  // Terrain elevation at the observer's current standing lat/lon; kept fresh
+  // by refreshElevation() so the ground camera's eye height rides the terrain.
+  let currentElevationM: number | null = null;
+  function refreshElevation(): void {
+    currentElevationM =
+      current.body !== null && current.lat !== null && current.lon !== null
+        ? sim.bodyElevation(current.body, current.lat, current.lon)
+        : null;
+  }
 
   const clock = new SimClock();
   clock.t = current.t;
@@ -159,6 +179,8 @@ async function boot(): Promise<void> {
     compass.setVisible(true);
     if (clock.speed > 3600) { clock.speed = 3600; hud.setActiveSpeed(3600); }
     hud.setMaxSpeed(3600);
+    setStandingGlobe(body);
+    refreshElevation();
     syncUrl();
   }
   function exitGround(): void {
@@ -167,6 +189,7 @@ async function boot(): Promise<void> {
     current.view = 'space';
     refreshViewButton();
     hud.setMaxSpeed(null);
+    setStandingGlobe(null);
     syncUrl();
   }
 
@@ -241,7 +264,7 @@ async function boot(): Promise<void> {
   };
   const heldKeys = new Set<'w' | 'a' | 's' | 'd'>();
   let shiftHeld = false;
-  const WALK_DEG_PER_S = 20;
+  const WALK_M_PER_S = 1.4;
   addEventListener('keydown', (e) => {
     if (document.activeElement instanceof HTMLInputElement) return;
     if (e.key === 'Shift') shiftHeld = true;
@@ -279,7 +302,9 @@ async function boot(): Promise<void> {
     if (current.view === 'ground' && current.body !== null) {
       if (heldKeys.size > 0 && current.lat !== null && current.lon !== null) {
         const speedMult = shiftHeld ? 5 : 1;
-        const step = WALK_DEG_PER_S * speedMult * dt;
+        const rM = bodyRadiusM(sim.descriptor, layout[current.body]!);
+        const degPerMeter = 180 / (Math.PI * rM);
+        const step = WALK_M_PER_S * speedMult * dt * degPerMeter;
         let dF = 0, dR = 0; // forward, rightward relative to the compass heading
         if (heldKeys.has('w')) dF += 1;
         if (heldKeys.has('s')) dF -= 1;
@@ -289,9 +314,12 @@ async function boot(): Promise<void> {
           const { latDeg, lonDeg } = stepLatLon(current.lat, current.lon, yaw, dF, dR, step);
           current.lat = latDeg;
           current.lon = lonDeg;
+          refreshElevation();
         }
       }
-      ground.update(states, { body: current.body, latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 });
+      renderer.autoClear = false;
+      renderer.clear();
+      const suns = ground.update(states, { body: current.body, latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 });
       groundCamera.position.set(0, 0, 0);
       groundCamera.lookAt(Math.sin(yaw) * Math.cos(pitch), Math.cos(yaw) * Math.cos(pitch), Math.sin(pitch));
       if (now - lastDateUpdate > 250) {
@@ -300,8 +328,15 @@ async function boot(): Promise<void> {
         compass.setHeading(yaw, pitch, { latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 });
       }
       renderer.render(ground.scene, groundCamera);
+      if (terrainGlobe) {
+        const eyeAlt = (currentElevationM ?? 0) + 1.7;
+        terrainGlobe.update(current.lat ?? 0, current.lon ?? 0, eyeAlt, suns, 2);
+        renderer.clearDepth();
+        renderer.render(terrainGlobe.scene, groundCamera);
+      }
       labelRenderer.render(ground.scene, groundCamera);
     } else {
+      renderer.autoClear = true;
       view.update(states, trueScale, sim.hostOriginAt(clock.t), clock.t);
       if (focused !== null) controls.target.lerp(view.bodies[focused]!.position, 0.15);
       controls.update();
