@@ -74,7 +74,7 @@ export function buildTileMesh(t: TileId, elevationsM: Float32Array, inputs: Tile
       const i1 = i0 + 1;
       const i2 = i0 + n;
       const i3 = i2 + 1;
-      indices.set([i0, i2, i1, i1, i2, i3], o);
+      indices.set([i0, i1, i2, i1, i3, i2], o);
       o += 6;
     }
   }
@@ -83,7 +83,7 @@ export function buildTileMesh(t: TileId, elevationsM: Float32Array, inputs: Tile
     const gi1 = ring[(s + 1) % ring.length]!;
     const s0 = gridCount + s;
     const s1 = gridCount + ((s + 1) % ring.length);
-    indices.set([gi0, s0, gi1, gi1, s0, s1], o);
+    indices.set([gi0, gi1, s0, gi1, s1, s0], o);
     o += 6;
   }
 

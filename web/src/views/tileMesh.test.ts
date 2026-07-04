@@ -64,4 +64,49 @@ describe('buildTileMesh', () => {
     expect(deep.colors[2]!).toBeGreaterThan(deep.colors[0]!);      // blue-dominant
     expect(peak.colors[0]!).toBeGreaterThan(deep.colors[0]!);      // brighter red channel
   });
+
+  it('throws when elevationsM length does not match the grid vertex count', () => {
+    expect(() => buildTileMesh(t, new Float32Array(3), inputs)).toThrow();
+  });
+
+  it('grid and skirt triangles wind outward (front-face normal points away from the planet center)', () => {
+    const m = buildTileMesh(t, flat(1000), inputs);
+    const o = m.originBf;
+    type V3 = [number, number, number];
+    const vertex = (i: number): V3 => [
+      o[0] + m.positions[3 * i]!,
+      o[1] + m.positions[3 * i + 1]!,
+      o[2] + m.positions[3 * i + 2]!,
+    ];
+    const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    const cross = (a: V3, b: V3): V3 => [
+      a[1] * b[2] - a[2] * b[1],
+      a[2] * b[0] - a[0] * b[2],
+      a[0] * b[1] - a[1] * b[0],
+    ];
+    const len = (a: V3) => Math.hypot(a[0], a[1], a[2]);
+    const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const unit = (a: V3): V3 => { const l = len(a); return [a[0] / l, a[1] / l, a[2] / l]; };
+
+    // First grid triangle: the essential regression. A CCW-front-face
+    // triangle on the tile's outer surface must have its cross-product
+    // normal pointing away from the planet center (same direction as the
+    // vertex's own radial/outward unit vector).
+    const [gi0, gi1, gi2] = [m.indices[0]!, m.indices[1]!, m.indices[2]!];
+    const [gp0, gp1, gp2] = [vertex(gi0), vertex(gi1), vertex(gi2)];
+    const gridNormal = cross(sub(gp1, gp0), sub(gp2, gp0));
+    const gridOutward = unit(gp0);
+    expect(dot(unit(gridNormal), gridOutward)).toBeGreaterThan(0.5);
+
+    // First skirt triangle, immediately after all grid-quad indices.
+    // Skirt curtains are nearly vertical (radial), so their front-face
+    // normal is tangential to the sphere rather than strongly outward —
+    // we only assert it isn't anti-parallel (i.e. not back-facing).
+    const skirtStart = 6 * TILE_QUADS * TILE_QUADS;
+    const [si0, si1, si2] = [m.indices[skirtStart]!, m.indices[skirtStart + 1]!, m.indices[skirtStart + 2]!];
+    const [sp0, sp1, sp2] = [vertex(si0), vertex(si1), vertex(si2)];
+    const skirtNormal = cross(sub(sp1, sp0), sub(sp2, sp0));
+    const skirtOutward = unit(sp0);
+    expect(dot(unit(skirtNormal), skirtOutward)).toBeGreaterThan(-0.5);
+  });
 });
