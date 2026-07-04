@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TileTree, type TreeConfig } from './tileTree';
-import { TILE_QUADS, tileEdgeLenM, tileKey } from './cubeSphere';
+import { tileKey } from './cubeSphere';
 
 const R = 6.371e6;
 const cfg: TreeConfig = { radiusM: R, splitK: 3, cacheCap: 320 };

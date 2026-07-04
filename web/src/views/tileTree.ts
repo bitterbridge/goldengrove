@@ -1,9 +1,7 @@
 /** LOD selection + build scheduling + LRU eviction for the terrain quadtree.
  * Pure logic — no three.js, no WASM — so it's unit-testable and the render
  * layer (terrainGlobe) stays a thin shell. */
-import {
-  TILE_QUADS, children, maxLevel, parent, tileCenterUnit, tileEdgeLenM, tileKey, type TileId,
-} from './cubeSphere';
+import { children, maxLevel, parent, tileCenterUnit, tileEdgeLenM, tileKey, type TileId } from './cubeSphere';
 
 export interface TreeConfig { radiusM: number; splitK: number; maxLevelOverride?: number; cacheCap: number }
 export interface TreeUpdate { render: TileId[]; build: TileId[]; evict: string[] }
