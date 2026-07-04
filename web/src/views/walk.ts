@@ -23,12 +23,41 @@ export function stepLatLon(
   return { latDeg: newLatDeg, lonDeg: newLonDeg };
 }
 
+/** Rotational coupling to the ground: 1 = carried with the planet's spin
+ * (walking, low flight), fading to 0 (inertial hover — the planet turns
+ * beneath you) between 5% and 50% of the body radius. */
+export function decoupleWeight(altM: number, radiusM: number): number {
+  const lo = 0.05 * radiusM;
+  const hi = 0.5 * radiusM;
+  const t = Math.min(1, Math.max(0, (altM - lo) / (hi - lo)));
+  return 1 - t * t * (3 - 2 * t);
+}
+
+/** Signed longitude drift for one frame at altitude: while decoupled, the
+ * planet spins east under a hovering observer, so their body-frame
+ * longitude drifts WEST (negative for positive spin). Add to lonDeg. */
+export function lonSlipDeg(altM: number, radiusM: number, spinRateRadPerS: number, dtS: number): number {
+  const w = decoupleWeight(altM, radiusM);
+  const result = (-(1 - w) * spinRateRadPerS * dtS * 180) / Math.PI;
+  return result === 0 ? 0 : result;
+}
+
+/** Spin rate from two ephemeris rotation samples, unwrapped mod 2π. */
+export function spinRateRadPerS(rot0: number, rot1: number, dtS: number): number {
+  let d = (rot1 - rot0) % (2 * Math.PI);
+  if (d < -Math.PI) d += 2 * Math.PI;
+  if (d > Math.PI) d -= 2 * Math.PI;
+  return d / dtS;
+}
+
 /** Vertical flight integration: hold-to-ascend/descend, rate scales with
  * altitude (min 2 m/s, alt/2 per second) so leaving the ground and reaching
  * limb view both feel responsive. Altitude clamps to [0, 10 * radiusM]. */
-export function flightStep(altM: number, dUp: number, dtS: number, radiusM: number): number {
+export function flightStep(altM: number, dUp: number, dtS: number, radiusM: number, aboveTerrainM: number): number {
   if (dUp === 0) return altM;
-  const rate = Math.max(2, altM / 2);
+  // Ascent: responsive exponential. Descent: same shape but braked against
+  // height above terrain so landings flare instead of slam.
+  const rate = dUp > 0 ? Math.max(2, altM / 2) : Math.max(2, Math.min(altM / 3, aboveTerrainM / 2));
   const next = altM + dUp * rate * dtS;
   return Math.min(10 * radiusM, Math.max(0, next));
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eyeTerrainM, flightStep, groundSpeedMps, stepLatLon } from './walk';
+import { decoupleWeight, eyeTerrainM, flightStep, groundSpeedMps, lonSlipDeg, spinRateRadPerS, stepLatLon } from './walk';
 
 describe('stepLatLon', () => {
   it('forward at az=0 increases lat', () => {
@@ -37,19 +37,72 @@ describe('stepLatLon', () => {
 describe('flightStep', () => {
   const R = 6.371e6;
   it('ascends from the ground at the 2 m/s floor', () => {
-    expect(flightStep(0, +1, 1, R)).toBeCloseTo(2, 6);
+    expect(flightStep(0, +1, 1, R, 1e9)).toBeCloseTo(2, 6);
   });
   it('rate scales with altitude', () => {
-    expect(flightStep(10_000, +1, 1, R)).toBeCloseTo(15_000, 0); // 10km + 10km/2*1s
+    expect(flightStep(10_000, +1, 1, R, 1e9)).toBeCloseTo(15_000, 0); // 10km + 10km/2*1s
   });
   it('descends and clamps at the ground', () => {
-    expect(flightStep(3, -1, 10, R)).toBe(0);
+    expect(flightStep(3, -1, 10, R, 1e9)).toBe(0);
   });
   it('clamps at 10 radii', () => {
-    expect(flightStep(10 * R, +1, 100, R)).toBe(10 * R);
+    expect(flightStep(10 * R, +1, 100, R, 1e9)).toBe(10 * R);
   });
   it('holds altitude with no input', () => {
-    expect(flightStep(5000, 0, 1, R)).toBe(5000);
+    expect(flightStep(5000, 0, 1, R, 1e9)).toBe(5000);
+  });
+});
+
+describe('decoupleWeight', () => {
+  const R = 6.371e6;
+  it('is 1 on the ground and up to 0.05R', () => {
+    expect(decoupleWeight(0, R)).toBe(1);
+    expect(decoupleWeight(0.05 * R, R)).toBe(1);
+  });
+  it('is 0 at and above 0.5R', () => {
+    expect(decoupleWeight(0.5 * R, R)).toBe(0);
+    expect(decoupleWeight(5 * R, R)).toBe(0);
+  });
+  it('decreases monotonically in between', () => {
+    const a = decoupleWeight(0.1 * R, R);
+    const b = decoupleWeight(0.3 * R, R);
+    expect(a).toBeGreaterThan(b);
+    expect(b).toBeGreaterThan(0);
+    expect(a).toBeLessThan(1);
+  });
+});
+
+describe('lonSlipDeg', () => {
+  const R = 6.371e6;
+  it('is zero on the ground', () => {
+    expect(lonSlipDeg(0, R, 7.3e-5, 1)).toBe(0);
+  });
+  it('slips fully at inertial altitude: planet spins east under you, you drift west', () => {
+    const slip = lonSlipDeg(R, R, 7.3e-5, 10);
+    expect(slip).toBeCloseTo((-7.3e-5 * 10 * 180) / Math.PI, 9);
+  });
+});
+
+describe('spinRateRadPerS', () => {
+  it('differences adjacent rotation samples', () => {
+    expect(spinRateRadPerS(1.0, 1.006, 60)).toBeCloseTo(1e-4, 9);
+  });
+  it('unwraps across the 2π seam', () => {
+    expect(spinRateRadPerS(2 * Math.PI - 0.003, 0.003, 60)).toBeCloseTo(1e-4, 9);
+  });
+});
+
+describe('flightStep descent brake', () => {
+  const R = 6.371e6;
+  it('descending from high altitude over low terrain uses alt/3', () => {
+    expect(flightStep(90_000, -1, 1, R, 89_000)).toBeCloseTo(90_000 - 30_000, 0);
+  });
+  it('flares against height above terrain', () => {
+    // 5 km up but only 100 m above a mountain top: rate = max(2, min(1667, 50)) = 50
+    expect(flightStep(5_000, -1, 1, R, 100)).toBeCloseTo(4_950, 6);
+  });
+  it('ascent is unchanged by aboveTerrain', () => {
+    expect(flightStep(10_000, +1, 1, R, 5)).toBeCloseTo(15_000, 0);
   });
 });
 

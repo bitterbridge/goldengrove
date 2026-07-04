@@ -324,7 +324,7 @@ async function boot(): Promise<void> {
       const rM = bodyRadiusM(sim.descriptor, layout[current.body]!);
       const dUp = (flightKeys.has('r') ? 1 : 0) - (flightKeys.has('f') ? 1 : 0);
       if (dUp !== 0) {
-        flightAltM = flightStep(flightAltM, dUp, dt, rM);
+        flightAltM = flightStep(flightAltM, dUp, dt, rM, Number.POSITIVE_INFINITY); // Task 5 wires the real aboveTerrainM
       }
       if (heldKeys.size > 0 && current.lat !== null && current.lon !== null) {
         const speedMps = groundSpeedMps(flightAltM, shiftHeld);
