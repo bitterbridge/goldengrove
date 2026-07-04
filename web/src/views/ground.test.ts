@@ -140,4 +140,16 @@ describe('buildGroundScene', () => {
     expect(suns.length).toBeGreaterThanOrEqual(1);
     expect(suns[0]!.irradiance).toBe(1); // normalized, brightest first
   });
+
+  it('sky density falls off exponentially with altitude', () => {
+    const sim = fakeSim();
+    const g = buildGroundScene(sim);
+    const dome = g.scene.getObjectByName('skydome') as THREE.Mesh;
+    const uniforms = (dome.material as THREE.ShaderMaterial).uniforms;
+    g.update(sim.statesAt(0), { body: anchorBody, latDeg: 0, lonDeg: 180 }, 0);
+    const d0 = uniforms.density!.value as number;
+    g.update(sim.statesAt(0), { body: anchorBody, latDeg: 0, lonDeg: 180 }, 8500);
+    const d1 = uniforms.density!.value as number;
+    expect(d1).toBeCloseTo(d0 * Math.exp(-1), 5);
+  });
 });

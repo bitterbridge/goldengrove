@@ -8,7 +8,7 @@ import { buildGroundScene, type GroundView } from './views/ground';
 import { buildTerrainGlobe, type TerrainGlobe } from './views/terrainGlobe';
 import { pointToLatLon, type Vec3 } from './views/observer';
 import { stepLatLon } from './views/walk';
-import { bodyLayout, bodyRadiusM, parentIndex, standableBody } from './sim/layout';
+import { atmosphereDensityFor, bodyLayout, bodyRadiusM, parentIndex, standableBody } from './sim/layout';
 import { buildHud, formatDate } from './ui/hud';
 import { buildCompass } from './ui/compass';
 import { randomSeed } from './ui/seed';
@@ -324,7 +324,9 @@ async function boot(): Promise<void> {
       }
       renderer.autoClear = false;
       renderer.clear();
-      const suns = ground.update(states, { body: current.body, latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 });
+      // flightAltM arrives in Task 4; ground observers are always at surface level until then.
+      const flightAltM = 0;
+      const suns = ground.update(states, { body: current.body, latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 }, flightAltM);
       groundCamera.position.set(0, 0, 0);
       groundCamera.lookAt(Math.sin(yaw) * Math.cos(pitch), Math.cos(yaw) * Math.cos(pitch), Math.sin(pitch));
       if (now - lastDateUpdate > 250) {
@@ -335,7 +337,8 @@ async function boot(): Promise<void> {
       renderer.render(ground.scene, groundCamera);
       if (terrainGlobe) {
         const eyeAlt = (currentElevationM ?? 0) + 1.7;
-        terrainGlobe.update(current.lat ?? 0, current.lon ?? 0, eyeAlt, suns, 2);
+        const atmDensity = atmosphereDensityFor(sim.descriptor, layout[current.body]!);
+        terrainGlobe.update(current.lat ?? 0, current.lon ?? 0, eyeAlt, suns, 2, atmDensity, ground.dayFactor());
         renderer.clearDepth();
         renderer.render(terrainGlobe.scene, groundCamera);
       }

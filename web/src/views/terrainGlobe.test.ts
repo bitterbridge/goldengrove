@@ -137,4 +137,16 @@ describe('buildTerrainGlobe', () => {
     expect(day).toBeGreaterThan(0.5);
     expect(night).toBe(0);
   });
+
+  it('fog density scales with atmosphere and fades with altitude; airless = no fog', () => {
+    const g = buildTerrainGlobe(fakeSim(), anchorBody)!;
+    g.update(15, 30, 252, suns, 2, 1.0, 1.0);
+    const fogLow = (g.scene.fog as THREE.FogExp2).density;
+    expect(fogLow).toBeGreaterThan(0);
+    g.update(15, 30, 100_000, suns, 2, 1.0, 1.0);
+    const fogHigh = (g.scene.fog as THREE.FogExp2).density;
+    expect(fogHigh).toBeLessThan(fogLow / 100);
+    g.update(15, 30, 252, suns, 2, 0.0, 1.0);
+    expect((g.scene.fog as THREE.FogExp2).density).toBe(0);
+  });
 });

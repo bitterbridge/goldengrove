@@ -18,7 +18,15 @@ import { buildTileMesh } from './tileMesh';
 
 export interface TerrainGlobe {
   scene: THREE.Scene;
-  update(latDeg: number, lonDeg: number, eyeAltM: number, suns: SunSpec[], buildBudget?: number): void;
+  update(
+    latDeg: number,
+    lonDeg: number,
+    eyeAltM: number,
+    suns: SunSpec[],
+    buildBudget?: number,
+    atmDensity?: number,
+    dayFactor?: number,
+  ): void;
   stats(): { built: number; pendingBuilds: number };
   dispose(): void;
 }
@@ -39,6 +47,7 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
   const dead = ref.kind === 'planet' && desc.planets[ref.planet]!.state.kind === 'Dead';
 
   const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0a0e14, 0);
   scene.add(new THREE.AmbientLight(0x334455, 0.3));
   const sunLights = [new THREE.DirectionalLight(0xffffff, 0), new THREE.DirectionalLight(0xffffff, 0)];
   sunLights.forEach((l) => scene.add(l));
@@ -100,7 +109,15 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
     tree.markBuilt(tileKey(t));
   }
 
-  function update(latDeg: number, lonDeg: number, eyeAltM: number, suns: SunSpec[], buildBudget = 2): void {
+  function update(
+    latDeg: number,
+    lonDeg: number,
+    eyeAltM: number,
+    suns: SunSpec[],
+    buildBudget = 2,
+    atmDensity = 0,
+    dayFactor = 0,
+  ): void {
     const lat = (latDeg * Math.PI) / 180;
     const lon = (lonDeg * Math.PI) / 180;
     const up: [number, number, number] = [Math.cos(lat) * Math.cos(lon), Math.cos(lat) * Math.sin(lon), Math.sin(lat)];
@@ -179,6 +196,13 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
         l.intensity = 0;
       }
     });
+
+    // exponential distance fog: scales with atmosphere thickness and thins
+    // with eye altitude (scale height H = 8500 m, Earth-like); airless
+    // bodies (atmDensity = 0) get none.
+    const fog = scene.fog as THREE.FogExp2;
+    fog.density = 2.5e-5 * atmDensity * Math.exp(-eyeAltM / 8500);
+    fog.color.setHex(0x0a0e14).lerp(new THREE.Color(0x9db4c8), dayFactor);
   }
 
   function dispose(): void {

@@ -15,7 +15,7 @@ export interface GroundView {
   scene: THREE.Scene;
   bodies: THREE.Mesh[];
   labels: CSS2DObject[];
-  update(states: Float64Array, standing: Standing): SunSpec[];
+  update(states: Float64Array, standing: Standing, altitudeM?: number): SunSpec[];
   dayFactor(): number;
   setDiscVisible(v: boolean): void;
 }
@@ -89,7 +89,7 @@ export function buildGroundScene(sim: Sim): GroundView {
     ground.visible = v;
   }
 
-  function update(states: Float64Array, standing: Standing): SunSpec[] {
+  function update(states: Float64Array, standing: Standing, altitudeM = 0): SunSpec[] {
     const frame = observerFrame(states, desc, standing.body, standing.latDeg, standing.lonDeg);
     const visible: SkyBody[] = skyBodies(states, desc, standing.body, frame);
 
@@ -123,7 +123,8 @@ export function buildGroundScene(sim: Sim): GroundView {
     suns.forEach((s) => { s.irradiance = maxIrr > 0 ? s.irradiance / maxIrr : 0; });
     suns.sort((a, b) => b.irradiance - a.irradiance);
     sky.setSuns(suns);
-    sky.setDensity(atmosphereDensityFor(desc, layout[standing.body]!));
+    // Karman-line falloff: same scale height (H = 8500 m) as terrain fog.
+    sky.setDensity(atmosphereDensityFor(desc, layout[standing.body]!) * Math.exp(-altitudeM / 8500));
 
     // These lights only illuminate sky-body meshes (ground disc, stars, and
     // dome are all unlit materials), so they stay on even when the sun is
