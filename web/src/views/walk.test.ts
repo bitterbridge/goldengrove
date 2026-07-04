@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { flightStep, groundSpeedMps, stepLatLon } from './walk';
+import { eyeTerrainM, flightStep, groundSpeedMps, stepLatLon } from './walk';
 
 describe('stepLatLon', () => {
   it('forward at az=0 increases lat', () => {
@@ -63,5 +63,15 @@ describe('groundSpeedMps', () => {
     // 100 m/s skim floor, so flying speed has grown past it.
     expect(groundSpeedMps(1000, false)).toBe(500);
     expect(groundSpeedMps(50_000, false)).toBe(25_000);
+  });
+});
+
+describe('eyeTerrainM', () => {
+  it('floors the eye at wading depth on ocean worlds', () => {
+    expect(eyeTerrainM(-95, true)).toBeCloseTo(-0.7, 9); // -0.7 + 1.7 eye = +1.0 m above the sea
+    expect(eyeTerrainM(5, true)).toBe(5);
+  });
+  it('follows terrain everywhere on dry worlds', () => {
+    expect(eyeTerrainM(-95, false)).toBe(-95);
   });
 });

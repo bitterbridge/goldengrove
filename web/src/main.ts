@@ -7,7 +7,7 @@ import { buildSpaceScene, type SpaceView } from './views/space';
 import { buildGroundScene, type GroundView } from './views/ground';
 import { buildTerrainGlobe, type TerrainGlobe } from './views/terrainGlobe';
 import { pointToLatLon, type Vec3 } from './views/observer';
-import { flightStep, groundSpeedMps, stepLatLon } from './views/walk';
+import { eyeTerrainM, flightStep, groundSpeedMps, stepLatLon } from './views/walk';
 import { atmosphereDensityFor, bodyLayout, bodyRadiusM, parentIndex, standableBody } from './sim/layout';
 import { buildHud, formatDate } from './ui/hud';
 import { buildCompass } from './ui/compass';
@@ -76,9 +76,11 @@ async function boot(): Promise<void> {
   // at runtime (stand-here on another body) — main.ts owns the terrain globe
   // lifecycle and rebuilds it whenever the standing body changes.
   let terrainGlobe: TerrainGlobe | null = null;
+  let standingOcean = false;
   function setStandingGlobe(body: number | null): void {
     terrainGlobe?.dispose();
     terrainGlobe = body !== null ? buildTerrainGlobe(sim, body) : null;
+    standingOcean = body !== null && (sim.bodyTerrainInfo(body)?.ocean_fraction ?? 0) > 0;
     ground.setDiscVisible(terrainGlobe === null);
   }
 
@@ -355,7 +357,7 @@ async function boot(): Promise<void> {
         // LOD refinement must use height above the LOCAL terrain, not above
         // sea level — folding terrain elevation into the LOD altitude
         // stalls refinement early exactly underfoot (see terrainGlobe.ts).
-        const terrainM = currentElevationM ?? 0;
+        const terrainM = eyeTerrainM(currentElevationM ?? 0, standingOcean);
         const aboveTerrainM = 1.7 + flightAltM;
         const atmDensity = atmosphereDensityFor(sim.descriptor, layout[current.body]!);
         terrainGlobe.update(current.lat ?? 0, current.lon ?? 0, terrainM, aboveTerrainM, suns, 2, atmDensity, ground.dayFactor());

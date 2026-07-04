@@ -39,3 +39,10 @@ export function groundSpeedMps(altM: number, shiftHeld: boolean): number {
   if (altM > 0) return Math.max(100, altM / 2);
   return shiftHeld ? 100 : 1.4;
 }
+
+/** The camera never submerges: on ocean worlds the effective terrain height
+ * under the eye floors at -0.7 m, so eye = terrain + 1.7 wades 1 m above the
+ * sea surface. Dry worlds follow the terrain into any basin. */
+export function eyeTerrainM(terrainM: number, oceanWorld: boolean): number {
+  return oceanWorld ? Math.max(terrainM, -0.7) : terrainM;
+}
