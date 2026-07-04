@@ -25,7 +25,10 @@ git history, not here.
 6. Trench/ridge window retuning at higher texture resolutions.
 7. **Ground-view 3D terrain** — the big one. `elevation(lat, lon)` already
    exists; the ground view doesn't consume it yet. Real horizons, standing on
-   a mountain, coastlines you can walk to.
+   a mountain, coastlines you can walk to. Chosen approach (2026-07-04 spec):
+   global quadtree cube-sphere with free-flight, sized for the Outer
+   Wilds arc — the space-view merge (one continuous scene, surface to
+   interplanetary space) follows as its own stage after this one.
 8. Texture seam & pole polish — equirect artifacts at lon ±180° and the poles.
 9. Terrain-aware stand-here — spawn on land; show elevation in the HUD.
 10. Erosion pass — fluvial/thermal; softens the tectonic skeleton.
