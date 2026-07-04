@@ -20,6 +20,7 @@ export interface TerrainGlobe {
   scene: THREE.Scene;
   update(latDeg: number, lonDeg: number, eyeAltM: number, suns: SunSpec[], buildBudget?: number): void;
   stats(): { built: number; pendingBuilds: number };
+  dispose(): void;
 }
 
 const PALETTE = { Rocky: 0x9b8f7a, IceGiant: 0x7ec8e3, GasGiant: 0xd8b27a } as const;
@@ -138,5 +139,14 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
     });
   }
 
-  return { scene, update, stats: () => ({ built: meshes.size, pendingBuilds }) };
+  function dispose(): void {
+    for (const [, mesh] of meshes) {
+      mesh.geometry.dispose();
+      scene.remove(mesh);
+    }
+    meshes.clear();
+    material.dispose();
+  }
+
+  return { scene, update, stats: () => ({ built: meshes.size, pendingBuilds }), dispose };
 }

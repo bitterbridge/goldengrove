@@ -77,6 +77,7 @@ async function boot(): Promise<void> {
   // lifecycle and rebuilds it whenever the standing body changes.
   let terrainGlobe: TerrainGlobe | null = null;
   function setStandingGlobe(body: number | null): void {
+    terrainGlobe?.dispose();
     terrainGlobe = body !== null ? buildTerrainGlobe(sim, body) : null;
     ground.setDiscVisible(terrainGlobe === null);
   }

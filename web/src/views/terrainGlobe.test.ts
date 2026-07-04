@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import { parseDescriptor } from '../sim/parse';
 import { bodyLayout } from '../sim/layout';
 import type { Sim } from '../sim/wasm';
@@ -61,6 +62,28 @@ describe('buildTerrainGlobe', () => {
     });
     expect(nearest).toBeLessThan(50_000);
     expect(nearest).toBeGreaterThan(0);
+  });
+
+  it('disposes all tile geometries and clears the scene on dispose()', () => {
+    const g = buildTerrainGlobe(fakeSim(), anchorBody)!;
+    for (let f = 0; f < 40; f++) g.update(15, 30, 252, suns, 8);
+
+    const meshesBefore: THREE.Mesh[] = [];
+    g.scene.traverse((o) => { if ((o as { isMesh?: boolean }).isMesh) meshesBefore.push(o as THREE.Mesh); });
+    expect(meshesBefore.length).toBeGreaterThan(20);
+
+    // spy on one geometry's dispose to confirm dispose() actually reaches it
+    const sample = meshesBefore[0]!.geometry;
+    let disposed = false;
+    const originalDispose = sample.dispose.bind(sample);
+    sample.dispose = () => { disposed = true; originalDispose(); };
+
+    g.dispose();
+
+    expect(disposed).toBe(true);
+    let meshesAfter = 0;
+    g.scene.traverse((o) => { if ((o as { isMesh?: boolean }).isMesh) meshesAfter++; });
+    expect(meshesAfter).toBe(0);
   });
 
   it('has sun lights that fade below the horizon (ground darkens at night)', () => {
