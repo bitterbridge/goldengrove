@@ -1,6 +1,6 @@
+use gg_core::rng::RngStream;
 use gg_terrain::noise::{fbm, warped_fbm};
 use gg_terrain::sphere::random_unit;
-use gg_core::rng::RngStream;
 
 #[test]
 fn fbm_is_deterministic_bounded_and_seed_sensitive() {
@@ -27,7 +27,10 @@ fn fbm_is_continuous() {
     for d in 0..3 {
         let mut q = p;
         q[d] += e;
-        assert!((fbm(7, q, 6) - base).abs() < 1e-2, "discontinuity along axis {d}");
+        assert!(
+            (fbm(7, q, 6) - base).abs() < 1e-2,
+            "discontinuity along axis {d}"
+        );
     }
 }
 

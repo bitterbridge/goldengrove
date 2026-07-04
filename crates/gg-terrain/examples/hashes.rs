@@ -4,7 +4,11 @@
 use std::collections::BTreeMap;
 
 fn main() {
-    let seed: u64 = std::env::args().nth(1).expect("usage: hashes <seed>").parse().expect("u64 seed");
+    let seed: u64 = std::env::args()
+        .nth(1)
+        .expect("usage: hashes <seed>")
+        .parse()
+        .expect("u64 seed");
     let desc = gg_gen::generate(seed);
     let total = desc.stars.len()
         + desc.planets.len()
@@ -14,7 +18,10 @@ fn main() {
         if let Some(spec) = gg_terrain::TerrainSpec::for_body(seed, &desc, body) {
             out.insert(
                 format!("body_{body}"),
-                format!("{:#018x}", gg_terrain::heightmap_hash(&spec.heightmap(256, 128))),
+                format!(
+                    "{:#018x}",
+                    gg_terrain::heightmap_hash(&spec.heightmap(256, 128))
+                ),
             );
         }
     }

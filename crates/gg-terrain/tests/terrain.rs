@@ -24,8 +24,8 @@ fn convergent_continental_boundaries_rise_above_interiors() {
         }
         samples.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let mean: f64 = samples.iter().sum::<f64>() / samples.len() as f64;
-        let top: f64 = samples[samples.len() * 9 / 10..].iter().sum::<f64>()
-            / (samples.len() as f64 / 10.0);
+        let top: f64 =
+            samples[samples.len() * 9 / 10..].iter().sum::<f64>() / (samples.len() as f64 / 10.0);
         ratios.push(top - mean);
     }
     assert!(
@@ -37,8 +37,14 @@ fn convergent_continental_boundaries_rise_above_interiors() {
 #[test]
 fn non_terrain_bodies_probe_none() {
     let desc = generate(42);
-    assert!(__raw_probe(42, &desc, 0, 0.0, 0.0).is_none(), "stars have no terrain");
-    let giant = desc.planets.iter().position(|p| p.class != gg_gen::descriptor::PlanetClass::Rocky);
+    assert!(
+        __raw_probe(42, &desc, 0, 0.0, 0.0).is_none(),
+        "stars have no terrain"
+    );
+    let giant = desc
+        .planets
+        .iter()
+        .position(|p| p.class != gg_gen::descriptor::PlanetClass::Rocky);
     if let Some(g) = giant {
         assert!(__raw_probe(42, &desc, desc.stars.len() + g, 0.0, 0.0).is_none());
     }
@@ -54,8 +60,11 @@ fn ocean_fraction_matches_its_draw() {
         let map = spec.heightmap(128, 64);
         // the solve grid IS 128x64 with cos-lat weights, so the weighted
         // measurement must match info.ocean_fraction almost exactly:
-        assert!((info.ocean_fraction - weighted_ocean(&map, 128, 64)).abs() < 1e-9,
-            "seed {seed}: info {} vs measured", info.ocean_fraction);
+        assert!(
+            (info.ocean_fraction - weighted_ocean(&map, 128, 64)).abs() < 1e-9,
+            "seed {seed}: info {} vs measured",
+            info.ocean_fraction
+        );
         assert!(info.plate_count >= 6 && info.relief_m > 500.0);
     }
 }
@@ -81,9 +90,16 @@ fn dead_worlds_are_dry() {
     // seed 18's anchor is Dead (established earlier in the project QA)
     let desc = generate(18);
     let anchor_body = desc.stars.len() + desc.anchor_planet;
-    assert!(matches!(desc.planets[desc.anchor_planet].state, gg_gen::descriptor::WorldState::Dead));
+    assert!(matches!(
+        desc.planets[desc.anchor_planet].state,
+        gg_gen::descriptor::WorldState::Dead
+    ));
     let spec = TerrainSpec::for_body(18, &desc, anchor_body).unwrap();
-    assert!(spec.info().ocean_fraction <= 0.16, "dead world too wet: {}", spec.info().ocean_fraction);
+    assert!(
+        spec.info().ocean_fraction <= 0.16,
+        "dead world too wet: {}",
+        spec.info().ocean_fraction
+    );
 }
 
 #[test]
@@ -98,7 +114,10 @@ fn heightmap_layout_and_elevation_agree() {
         let lat = 90.0 - (row as f64 + 0.5) * 180.0 / h as f64;
         let lon = -180.0 + (col as f64 + 0.5) * 360.0 / w as f64;
         let direct = spec.elevation(lat, lon);
-        assert!((map[row * w + col] as f64 - direct).abs() < 1e-5, "row {row} col {col}");
+        assert!(
+            (map[row * w + col] as f64 - direct).abs() < 1e-5,
+            "row {row} col {col}"
+        );
     }
 }
 
@@ -147,16 +166,84 @@ fn golden_terrain_hashes_are_pinned() {
         let expected = std::fs::read_to_string(&path).unwrap_or_else(|_| {
             panic!("missing {path}; bootstrap: cargo run -p gg-terrain --example hashes -- {seed} > crates/gg-terrain/{path}")
         });
-        let expected: std::collections::BTreeMap<String, String> = serde_json::from_str(&expected).unwrap();
+        let expected: std::collections::BTreeMap<String, String> =
+            serde_json::from_str(&expected).unwrap();
         let desc = generate(seed);
-        let total = desc.stars.len() + desc.planets.len()
+        let total = desc.stars.len()
+            + desc.planets.len()
             + desc.planets.iter().map(|p| p.moons.len()).sum::<usize>();
         let mut actual = std::collections::BTreeMap::new();
         for body in 0..total {
             if let Some(spec) = TerrainSpec::for_body(seed, &desc, body) {
-                actual.insert(format!("body_{body}"), format!("{:#018x}", heightmap_hash(&spec.heightmap(256, 128))));
+                actual.insert(
+                    format!("body_{body}"),
+                    format!("{:#018x}", heightmap_hash(&spec.heightmap(256, 128))),
+                );
             }
         }
         assert_eq!(actual, expected, "seed {seed}: terrain diverged — shared worlds would change; this is the terrain determinism contract");
+    }
+}
+
+#[test]
+fn micro_detail_is_small_and_continuous() {
+    // Amplitude budget: micro is a spectral tail; |micro| must stay under
+    // ~0.007 relative units (sum of its octave amplitudes), and adjacent
+    // samples 1e-5 rad apart (~60 m) must not jump more than the finest
+    // octaves can move.
+    let mut worst_val = 0.0f64;
+    let mut worst_jump = 0.0f64;
+    let mut prev: Option<f64> = None;
+    for i in 0..20_000 {
+        let t = i as f64 * 1e-5;
+        let p = gg_terrain::sphere::latlon_to_unit(12.0 + t * 57.2957795, 40.0);
+        let m = gg_terrain::noise::micro(0xDEADBEEF, p);
+        worst_val = worst_val.max(m.abs());
+        if let Some(pv) = prev {
+            worst_jump = worst_jump.max((m - pv).abs());
+        }
+        prev = Some(m);
+    }
+    assert!(
+        worst_val < 0.007,
+        "micro amplitude {worst_val} exceeds spectral budget"
+    );
+    assert!(
+        worst_jump < 0.002,
+        "micro jump {worst_jump} over ~60 m step — discontinuous"
+    );
+    assert!(worst_val > 1e-5, "micro is degenerate/zero");
+}
+
+#[test]
+fn elevation_fine_agrees_with_elevation_at_scale() {
+    // fine = relief_m * (elevation + micro): the base field is untouched, so
+    // fine/relief must stay within the micro budget of elevation() everywhere.
+    let desc = generate(42);
+    let anchor = desc.stars.len() + desc.anchor_planet;
+    let spec = TerrainSpec::for_body(42, &desc, anchor).unwrap();
+    let relief = spec.info().relief_m;
+    for row in 0..32 {
+        let lat = 90.0 - (row as f64 + 0.5) * 180.0 / 32.0;
+        for col in 0..64 {
+            let lon = -180.0 + (col as f64 + 0.5) * 360.0 / 64.0;
+            let coarse = spec.elevation(lat, lon);
+            let fine = spec.elevation_fine(lat, lon);
+            let diff = (fine / relief - coarse).abs();
+            assert!(diff < 0.007, "spectral seam at ({lat},{lon}): {diff}");
+        }
+    }
+}
+
+#[test]
+fn elevation_fine_batch_matches_scalar() {
+    let desc = generate(42);
+    let anchor = desc.stars.len() + desc.anchor_planet;
+    let spec = TerrainSpec::for_body(42, &desc, anchor).unwrap();
+    let coords = [10.0, 20.0, -35.5, 170.25, 89.0, -179.0];
+    let batch = spec.elevation_fine_batch(&coords);
+    assert_eq!(batch.len(), 3);
+    for (i, pair) in coords.chunks_exact(2).enumerate() {
+        assert_eq!(batch[i], spec.elevation_fine(pair[0], pair[1]) as f32);
     }
 }

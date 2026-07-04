@@ -34,7 +34,13 @@ pub fn build_plates(rng: &mut RngStream, body_radius_m: f64, land_bias: f64) -> 
             } else {
                 rng.uniform(-0.75, -0.45)
             };
-            Plate { seed_point, euler_pole, rate, continental, base_elev }
+            Plate {
+                seed_point,
+                euler_pole,
+                rate,
+                continental,
+                base_elev,
+            }
         })
         .collect();
     Plates { plates }

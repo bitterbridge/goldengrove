@@ -78,13 +78,18 @@ struct RawTerrain {
 }
 
 impl RawTerrain {
-    fn build(rng: &mut RngStream, facts: &BodyFacts, land_bias: f64, seed: u64, body_index: usize) -> Self {
+    fn build(
+        rng: &mut RngStream,
+        facts: &BodyFacts,
+        land_bias: f64,
+        seed: u64,
+        body_index: usize,
+    ) -> Self {
         let plates = build_plates(rng, facts.radius_m, land_bias);
         // Noise seed derives from the root seed + body index, not from a draw:
         // adding octaves later must not shift the plate draws.
-        let noise_seed = seed
-            ^ (body_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
-            ^ 0xC0FF_EE00_D15E_A5E5;
+        let noise_seed =
+            seed ^ (body_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xC0FF_EE00_D15E_A5E5;
         let hotspot_count = rng.pick_count(0, 2);
         let hotspots = (0..hotspot_count)
             .map(|_| {
@@ -98,7 +103,11 @@ impl RawTerrain {
                 }
             })
             .collect();
-        RawTerrain { plates, noise_seed, hotspots }
+        RawTerrain {
+            plates,
+            noise_seed,
+            hotspots,
+        }
     }
 
     /// Plate-scale domain warp: seams and coastlines wander instead of
@@ -257,7 +266,13 @@ impl RawTerrain {
 /// Diagnostic probe: raw (pre-sea-level) elevation. Kept public-but-hidden
 /// so property tests and future tuning can see the composition directly.
 #[doc(hidden)]
-pub fn __raw_probe(seed: u64, desc: &SystemDescriptor, body_index: usize, lat_deg: f64, lon_deg: f64) -> Option<f64> {
+pub fn __raw_probe(
+    seed: u64,
+    desc: &SystemDescriptor,
+    body_index: usize,
+    lat_deg: f64,
+    lon_deg: f64,
+) -> Option<f64> {
     let facts = body_facts(desc, body_index)?;
     let mut rng = RngStream::root(seed).child(&format!("terrain-{body_index}"));
     // FIXED DRAW ORDER (shared with TerrainSpec::for_body): ocean target,
@@ -315,7 +330,12 @@ impl TerrainSpec {
         }
         let total_w: f64 = samples.iter().map(|(_, w)| w).sum();
         let frac_below = |s: f64| -> f64 {
-            samples.iter().filter(|(e, _)| *e < s).map(|(_, w)| w).sum::<f64>() / total_w
+            samples
+                .iter()
+                .filter(|(e, _)| *e < s)
+                .map(|(_, w)| w)
+                .sum::<f64>()
+                / total_w
         };
         let (mut lo, mut hi) = (-6.0f64, 6.0f64);
         for _ in 0..48 {
@@ -329,13 +349,39 @@ impl TerrainSpec {
         let sea_level = 0.5 * (lo + hi);
         let ocean_fraction = frac_below(sea_level);
 
-        Some(TerrainSpec { raw, sea_level, ocean_fraction, relief_m })
+        Some(TerrainSpec {
+            raw,
+            sea_level,
+            ocean_fraction,
+            relief_m,
+        })
     }
 
     /// Elevation relative to sea level (0 = shore), relative units;
     /// `info().relief_m` gives the meters-per-unit scale.
     pub fn elevation(&self, lat_deg: f64, lon_deg: f64) -> f64 {
         self.raw.raw_elevation(latlon_to_unit(lat_deg, lon_deg)) - self.sea_level
+    }
+
+    /// Elevation in METERS above sea level with micro-detail octaves that
+    /// continue the noise spectrum below heightmap resolution. The base
+    /// field is exactly elevation() (same draws, same values); micro adds
+    /// <0.7% of relief, so orrery textures and ground truth agree at
+    /// texture scale. The ground view and walking consume this.
+    pub fn elevation_fine(&self, lat_deg: f64, lon_deg: f64) -> f64 {
+        let p = latlon_to_unit(lat_deg, lon_deg);
+        let rel = self.raw.raw_elevation(p) - self.sea_level + noise::micro(self.raw.noise_seed, p);
+        rel * self.relief_m
+    }
+
+    /// Batched elevation_fine: coords is [lat0, lon0, lat1, lon1, ...] in
+    /// degrees. One FFI crossing per terrain tile build.
+    pub fn elevation_fine_batch(&self, coords: &[f64]) -> Vec<f32> {
+        debug_assert!(coords.len().is_multiple_of(2), "coords must be lat/lon pairs");
+        coords
+            .chunks_exact(2)
+            .map(|c| self.elevation_fine(c[0], c[1]) as f32)
+            .collect()
     }
 
     /// Equirect heightmap: row-major, row 0 = lat +90, col 0 = lon -180,
@@ -368,6 +414,21 @@ pub fn heightmap_hash(map: &[f32]) -> u64 {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for e in map {
         let q = ((f64::from(*e).clamp(-4.0, 4.0) / 4.0) * 32767.0) as i16;
+        for b in q.to_le_bytes() {
+            h ^= u64::from(b);
+            h = h.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    h
+}
+
+/// FNV-1a-64 over centimeter-quantized i32 little-endian bytes — the
+/// fine-elevation determinism fingerprint (meter-scale values exceed the
+/// coarse hash's ±4 relative-unit clamp, so it gets its own quantization).
+pub fn fine_hash(vals: &[f32]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for e in vals {
+        let q = (f64::from(*e) * 100.0).round() as i32;
         for b in q.to_le_bytes() {
             h ^= u64::from(b);
             h = h.wrapping_mul(0x0000_0100_0000_01b3);

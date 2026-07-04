@@ -32,14 +32,24 @@ fn plates_cover_realistic_counts_and_types() {
     for seed in 0..100u64 {
         let mut rng = RngStream::root(seed).child("plates-test");
         let p = build_plates(&mut rng, 6.371e6, 0.4);
-        assert!((6..=16).contains(&p.plates.len()), "seed {seed}: {}", p.plates.len());
-        assert!(p.plates.iter().any(|pl| pl.continental) || p.plates.len() < 8,
-            "seed {seed}: no continents at land_bias 0.4 is possible but should be rare");
+        assert!(
+            (6..=16).contains(&p.plates.len()),
+            "seed {seed}: {}",
+            p.plates.len()
+        );
+        assert!(
+            p.plates.iter().any(|pl| pl.continental) || p.plates.len() < 8,
+            "seed {seed}: no continents at land_bias 0.4 is possible but should be rare"
+        );
         for pl in &p.plates {
             assert!((norm(pl.seed_point) - 1.0).abs() < 1e-9);
             assert!((norm(pl.euler_pole) - 1.0).abs() < 1e-9);
             assert!(pl.rate > 0.0);
-            if pl.continental { assert!(pl.base_elev > 0.0) } else { assert!(pl.base_elev < 0.0) }
+            if pl.continental {
+                assert!(pl.base_elev > 0.0)
+            } else {
+                assert!(pl.base_elev < 0.0)
+            }
         }
     }
 }
@@ -65,8 +75,12 @@ fn velocity_is_tangent_and_scales_with_rate() {
     for _ in 0..100 {
         let x = random_unit(&mut probe);
         let v = p.velocity(0, x);
-        assert!(dot(v, x).abs() < 1e-9, "velocity must be tangent to the sphere");
-        let expected = gg_terrain::sphere::scale(cross(p.plates[0].euler_pole, x), p.plates[0].rate);
+        assert!(
+            dot(v, x).abs() < 1e-9,
+            "velocity must be tangent to the sphere"
+        );
+        let expected =
+            gg_terrain::sphere::scale(cross(p.plates[0].euler_pole, x), p.plates[0].rate);
         assert!(norm(sub(v, expected)) < 1e-12);
         // relative-velocity antisymmetry (spec): dv(a,b) = -dv(b,a)
         let dv_ab = sub(p.velocity(0, x), p.velocity(1, x));
