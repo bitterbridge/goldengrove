@@ -85,6 +85,10 @@ async function boot(): Promise<void> {
   // Terrain elevation at the observer's current standing lat/lon; kept fresh
   // by refreshElevation() so the ground camera's eye height rides the terrain.
   let currentElevationM: number | null = null;
+  // Free-flight altitude above the terrain eye height; 0 = on foot. Written
+  // only by flightStep() and the ground-entry/exit resets (never negative —
+  // the sky-density clamp depends on that).
+  let flightAltM = 0;
   function refreshElevation(): void {
     currentElevationM =
       current.body !== null && current.lat !== null && current.lon !== null
@@ -270,10 +274,11 @@ async function boot(): Promise<void> {
   };
   const heldKeys = new Set<'w' | 'a' | 's' | 'd'>();
   let shiftHeld = false;
-  let flightAltM = 0;
   const flightKeys = new Set<'r' | 'f'>();
   addEventListener('keydown', (e) => {
     if (document.activeElement instanceof HTMLInputElement) return;
+    // never swallow browser chords (Cmd/Ctrl+R reload, Cmd/Ctrl+F find, …)
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === 'Shift') shiftHeld = true;
     const mapped = WALK_KEY[e.key.toLowerCase()];
     if (mapped) {
