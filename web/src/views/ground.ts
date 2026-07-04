@@ -120,9 +120,12 @@ export function buildGroundScene(sim: Sim): GroundView {
     sky.setSuns(suns);
     sky.setDensity(atmosphereDensityFor(desc, layout[standing.body]!));
 
+    // These lights only illuminate sky-body meshes (ground disc, stars, and
+    // dome are all unlit materials), so they stay on even when the sun is
+    // below the observer's horizon — a moon at night is still sunlit.
     sunLights.forEach((l, i) => {
       const s = suns[i];
-      if (s && s.dirLocal[2] > -0.2) {
+      if (s) {
         l.intensity = 2.2 * s.irradiance;
         l.position.set(s.dirLocal[0] * 100, s.dirLocal[1] * 100, s.dirLocal[2] * 100);
         const [r, g, bb] = temperatureToColor(s.temperatureK);

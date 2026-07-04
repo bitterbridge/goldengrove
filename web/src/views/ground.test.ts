@@ -73,6 +73,22 @@ describe('buildGroundScene', () => {
     expect(g.dayFactor()).toBeLessThanOrEqual(1);
   });
 
+  it('keeps sky bodies sunlit when the sun is below the horizon (moon-at-night)', () => {
+    const sim = fakeSim();
+    const g = buildGroundScene(sim);
+    // fixture geometry: bodies along +x, axis +z; at lat 0 lon 0 the observer's
+    // up is +x and both suns sit at z ~ -1 — deep night. Sky bodies (the moon
+    // overhead at midnight) must still receive sunlight for correct phases.
+    g.update(sim.statesAt(0), { body: anchorBody, latDeg: 0, lonDeg: 0 });
+    const lights: THREE.DirectionalLight[] = [];
+    g.scene.traverse((o) => { if ((o as THREE.DirectionalLight).isDirectionalLight) lights.push(o as THREE.DirectionalLight); });
+    const total = lights.reduce((sum, l) => sum + l.intensity, 0);
+    expect(total).toBeGreaterThan(0);
+    // and the lit light still points from the sun's sky direction (below horizon)
+    const lit = lights.find((l) => l.intensity > 0)!;
+    expect(lit.position.z).toBeLessThan(0);
+  });
+
   it('applies body rotation from the axis+angle state slots', () => {
     const sim = fakeSim();
     const g = buildGroundScene(sim);
