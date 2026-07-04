@@ -5,9 +5,10 @@ import { loadSim, WasmLoadError, type Sim } from './sim/wasm';
 import { SimClock } from './time/clock';
 import { buildSpaceScene, type SpaceView } from './views/space';
 import { buildGroundScene, type GroundView } from './views/ground';
+import { buildLocalBodies } from './views/localBodies';
 import { buildTerrainGlobe, type TerrainGlobe } from './views/terrainGlobe';
-import { pointToLatLon, type Vec3 } from './views/observer';
-import { eyeTerrainM, flightStep, groundSpeedMps, stepLatLon } from './views/walk';
+import { observerFrame, pointToLatLon, type Vec3 } from './views/observer';
+import { decoupleWeight, eyeTerrainM, flightStep, groundSpeedMps, lonSlipDeg, spinRateRadPerS, stepLatLon } from './views/walk';
 import { atmosphereDensityFor, bodyLayout, bodyRadiusM, parentIndex, standableBody } from './sim/layout';
 import { buildHud, formatDate } from './ui/hud';
 import { buildCompass } from './ui/compass';
@@ -66,11 +67,18 @@ async function boot(): Promise<void> {
   const view: SpaceView = buildSpaceScene(sim);
 
   // --- ground view ---
-  const groundCamera = new THREE.PerspectiveCamera(60, 1, 0.3, 5e7);
+  const groundCamera = new THREE.PerspectiveCamera(60, 1, 0.3, 1e13);
   groundCamera.up.set(0, 0, 1);
   let yaw = 0; // 0 = north (+Y), positive east
   let pitch = 0.15;
+  const PITCH_LIMIT = (89 * Math.PI) / 180;
   const ground: GroundView = buildGroundScene(sim);
+  // True-scale local space: every non-standing body at real distance/size,
+  // camera-relative in the observer's ENU frame. Built once — only the
+  // terrain globe (below) is per-standing-body and gets rebuilt.
+  const localBodies = buildLocalBodies(sim);
+  const localSpace = new THREE.Scene();
+  localSpace.add(localBodies.group);
 
   // The ground scene is built once at boot, but the standing body can change
   // at runtime (stand-here on another body) — main.ts owns the terrain globe
@@ -91,6 +99,13 @@ async function boot(): Promise<void> {
   // only by flightStep() and the ground-entry/exit resets (never negative —
   // the sky-density clamp depends on that).
   let flightAltM = 0;
+  // Rotational decoupling: how fast the standing body's surface spins under a
+  // hovering observer. Recomputed once per enterGround() from two ephemeris
+  // samples 60s apart; only used while flightAltM > 0.
+  let standingSpinRate = 0;
+  function wrapLon(lonDeg: number): number {
+    return ((lonDeg + 540) % 360) - 180;
+  }
   function refreshElevation(): void {
     currentElevationM =
       current.body !== null && current.lat !== null && current.lon !== null
@@ -146,7 +161,7 @@ async function boot(): Promise<void> {
     // Keep the address bar shareable at all times (replaceState never fires
     // hashchange, so this can't trigger the reload listener). The share
     // button remains the way to capture the exact MOMENT (current t).
-    history.replaceState(null, '', serializeAppState({ ...current, t: clock.t, speed: clock.speed, body: focused }));
+    history.replaceState(null, '', serializeAppState({ ...current, t: clock.t, speed: clock.speed, body: focused, alt: flightAltM }));
   }
 
   function defaultStandPoint(body: number): { latDeg: number; lonDeg: number } {
@@ -182,7 +197,10 @@ async function boot(): Promise<void> {
     focused = body;
     yaw = 0;
     pitch = 0.15;
-    flightAltM = 0;
+    flightAltM = Math.max(0, current.alt ?? 0);
+    const states0 = sim.statesAt(clock.t);
+    const states60 = sim.statesAt(clock.t + 60);
+    standingSpinRate = spinRateRadPerS(states0[body * 7 + 6]!, states60[body * 7 + 6]!, 60);
     refreshViewButton();
     compass.setVisible(true);
     if (clock.speed > 3600) { clock.speed = 3600; hud.setActiveSpeed(3600); }
@@ -225,7 +243,7 @@ async function boot(): Promise<void> {
   renderer.domElement.addEventListener('pointermove', (e) => {
     if (current.view !== 'ground' || !dragging) return;
     yaw -= e.movementX * 0.0032;
-    pitch = Math.min(Math.PI / 2 - 0.01, Math.max(-0.45, pitch + e.movementY * 0.0032));
+    pitch = Math.min(PITCH_LIMIT, Math.max(-PITCH_LIMIT, pitch + e.movementY * 0.0032));
     compass.setHeading(yaw, pitch, { latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 }, currentElevationM, flightAltM);
   });
   renderer.domElement.addEventListener('pointerup', (e) => {
@@ -299,7 +317,7 @@ async function boot(): Promise<void> {
     const mapped = WALK_KEY[e.key.toLowerCase()];
     if (mapped && heldKeys.delete(mapped) && current.view === 'ground') syncUrl();
     const key = e.key.toLowerCase();
-    if (key === 'r' || key === 'f') flightKeys.delete(key);
+    if ((key === 'r' || key === 'f') && flightKeys.delete(key) && current.view === 'ground') syncUrl();
   });
   addEventListener('blur', () => { heldKeys.clear(); shiftHeld = false; flightKeys.clear(); });
 
@@ -324,7 +342,9 @@ async function boot(): Promise<void> {
       const rM = bodyRadiusM(sim.descriptor, layout[current.body]!);
       const dUp = (flightKeys.has('r') ? 1 : 0) - (flightKeys.has('f') ? 1 : 0);
       if (dUp !== 0) {
-        flightAltM = flightStep(flightAltM, dUp, dt, rM, Number.POSITIVE_INFINITY); // Task 5 wires the real aboveTerrainM
+        // Height above terrain is flight altitude plus eye height — terrain
+        // elevation itself is not altitude.
+        flightAltM = flightStep(flightAltM, dUp, dt, rM, flightAltM + 1.7);
       }
       if (heldKeys.size > 0 && current.lat !== null && current.lon !== null) {
         const speedMps = groundSpeedMps(flightAltM, shiftHeld);
@@ -342,6 +362,16 @@ async function boot(): Promise<void> {
           refreshElevation();
         }
       }
+      // Rotational decoupling: while hovering, the planet spins beneath the
+      // observer rather than carrying them along — their body-frame longitude
+      // slips west. w === 1 (walking/low flight) means fully coupled, no slip.
+      if (flightAltM > 0 && current.lat !== null && current.lon !== null) {
+        const w = decoupleWeight(flightAltM, rM);
+        if (w < 1) {
+          current.lon = wrapLon(current.lon + lonSlipDeg(flightAltM, rM, standingSpinRate, dt));
+          refreshElevation();
+        }
+      }
       renderer.autoClear = false;
       renderer.clear();
       const suns = ground.update(states, { body: current.body, latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 }, flightAltM);
@@ -353,18 +383,33 @@ async function boot(): Promise<void> {
         compass.setHeading(yaw, pitch, { latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 }, currentElevationM, flightAltM);
       }
       renderer.render(ground.scene, groundCamera);
+      renderer.clearDepth();
+
+      // Local space: every other body at true distance/scale, camera-relative
+      // in the observer's ENU frame. Same depth buffer as the terrain pass
+      // below — no second clear — so terrain occludes bodies below the
+      // horizon and bodies occlude each other correctly.
+      const terrainM = eyeTerrainM(currentElevationM ?? 0, standingOcean);
+      const aboveTerrainM = 1.7 + flightAltM;
+      const frame = observerFrame(states, sim.descriptor, current.body, current.lat ?? 0, current.lon ?? 0);
+      const eyeAboveCenterM = terrainM + aboveTerrainM;
+      const obsWorld: Vec3 = [
+        frame.positionM[0] + frame.up[0] * eyeAboveCenterM,
+        frame.positionM[1] + frame.up[1] * eyeAboveCenterM,
+        frame.positionM[2] + frame.up[2] * eyeAboveCenterM,
+      ];
+      localBodies.update(states, obsWorld, frame, current.body, groundCamera, renderer.domElement.clientHeight);
+      renderer.render(localSpace, groundCamera);
+
       if (terrainGlobe) {
         // LOD refinement must use height above the LOCAL terrain, not above
         // sea level — folding terrain elevation into the LOD altitude
         // stalls refinement early exactly underfoot (see terrainGlobe.ts).
-        const terrainM = eyeTerrainM(currentElevationM ?? 0, standingOcean);
-        const aboveTerrainM = 1.7 + flightAltM;
         const atmDensity = atmosphereDensityFor(sim.descriptor, layout[current.body]!);
         terrainGlobe.update(current.lat ?? 0, current.lon ?? 0, terrainM, aboveTerrainM, suns, 2, atmDensity, ground.dayFactor());
-        renderer.clearDepth();
         renderer.render(terrainGlobe.scene, groundCamera);
       }
-      labelRenderer.render(ground.scene, groundCamera);
+      labelRenderer.render(localSpace, groundCamera);
     } else {
       renderer.autoClear = true;
       view.update(states, trueScale, sim.hostOriginAt(clock.t), clock.t);
