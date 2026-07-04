@@ -98,7 +98,7 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
     }
     const elevs = sim.bodyElevations(bodyIndex, coords);
     if (elevs.length !== n) return; // non-terrain body (shouldn't happen here)
-    const data = buildTileMesh(t, elevs, { radiusM, reliefM: info!.relief_m, classTint, dead });
+    const data = buildTileMesh(t, elevs, { radiusM, reliefM: info!.relief_m, classTint, dead, verticalScale: 1 });
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(data.colors, 3));
@@ -116,7 +116,7 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
       for (let i = 0; i < elevs.length; i++) if (elevs[i]! < 0) { dipsBelow = true; break; }
       if (dipsBelow) {
         const flat = new Float32Array(elevs.length); // all zeros = sea level
-        const w = buildTileMesh(t, flat, { radiusM, reliefM: info!.relief_m, classTint, dead });
+        const w = buildTileMesh(t, flat, { radiusM, reliefM: info!.relief_m, classTint, dead, verticalScale: 1 });
         const wg = new THREE.BufferGeometry();
         wg.setAttribute('position', new THREE.BufferAttribute(w.positions, 3));
         wg.setIndex(new THREE.BufferAttribute(w.indices, 1));

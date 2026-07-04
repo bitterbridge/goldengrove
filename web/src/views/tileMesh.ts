@@ -10,6 +10,7 @@ export interface TileMeshInputs {
   reliefM: number;
   classTint: [number, number, number];
   dead: boolean;
+  verticalScale: number;
 }
 
 export interface TileMeshData {
@@ -17,6 +18,11 @@ export interface TileMeshData {
   colors: Float32Array;
   indices: Uint32Array;
   originBf: [number, number, number];
+  /** Parent-grid (coarser-LOD) position for each vertex, xyz per vertex,
+   * same layout/origin as `positions`. Used for CDLOD geomorphing: grid
+   * vertices morph toward the decimated parent-grid position their parent
+   * tile would have generated, so that LOD transitions don't pop. */
+  parentPositions: Float32Array;
   /** Number of index entries belonging to grid quads only (excludes the
    * skirt-wall quads). Used to compute vertex normals from grid faces
    * alone — skirt walls are near-vertical and would otherwise pollute
@@ -59,7 +65,7 @@ export function buildTileMesh(t: TileId, elevationsM: Float32Array, inputs: Tile
     const ux = grid.units[3 * gi]!;
     const uy = grid.units[3 * gi + 1]!;
     const uz = grid.units[3 * gi + 2]!;
-    const r = R + elevationsM[gi]! + radialOffset;
+    const r = R + elevationsM[gi]! * inputs.verticalScale + radialOffset;
     positions[3 * out] = ux * r - originBf[0];
     positions[3 * out + 1] = uy * r - originBf[1];
     positions[3 * out + 2] = uz * r - originBf[2];
@@ -71,6 +77,48 @@ export function buildTileMesh(t: TileId, elevationsM: Float32Array, inputs: Tile
 
   for (let i = 0; i < gridCount; i++) writeVertex(i, i, 0);
   ring.forEach((gi, s) => writeVertex(gridCount + s, gi, -skirtDepth));
+
+  // Parent-grid (coarser-LOD) positions, for CDLOD geomorphing. Decimated
+  // from the already-built (scaled) `positions` grid: even/even vertices
+  // are kept as-is (the parent tile would generate the same vertex);
+  // odd-indexed vertices are the midpoint(s) of their even neighbors that
+  // the parent tile's coarser grid would actually emit.
+  const parentPositions = new Float32Array(positions.length);
+  const copyPos = (dstIdx: number, srcIdx: number) => {
+    parentPositions[3 * dstIdx] = positions[3 * srcIdx]!;
+    parentPositions[3 * dstIdx + 1] = positions[3 * srcIdx + 1]!;
+    parentPositions[3 * dstIdx + 2] = positions[3 * srcIdx + 2]!;
+  };
+  const midPos = (dstIdx: number, srcIdxA: number, srcIdxB: number) => {
+    parentPositions[3 * dstIdx] = (positions[3 * srcIdxA]! + positions[3 * srcIdxB]!) / 2;
+    parentPositions[3 * dstIdx + 1] = (positions[3 * srcIdxA + 1]! + positions[3 * srcIdxB + 1]!) / 2;
+    parentPositions[3 * dstIdx + 2] = (positions[3 * srcIdxA + 2]! + positions[3 * srcIdxB + 2]!) / 2;
+  };
+  for (let row = 0; row < n; row++) {
+    for (let col = 0; col < n; col++) {
+      const i = row * n + col;
+      const rowEven = row % 2 === 0;
+      const colEven = col % 2 === 0;
+      if (rowEven && colEven) {
+        copyPos(i, i);
+      } else if (rowEven && !colEven) {
+        midPos(i, row * n + (col - 1), row * n + (col + 1));
+      } else if (!rowEven && colEven) {
+        midPos(i, (row - 1) * n + col, (row + 1) * n + col);
+      } else {
+        midPos(i, (row - 1) * n + (col - 1), (row + 1) * n + (col + 1));
+      }
+    }
+  }
+  // Skirt vertices copy their SOURCE grid vertex's parent position (not
+  // their own dropped position) — the morph target must stay on the
+  // undropped grid surface, or geomorphing would re-raise the skirt.
+  ring.forEach((gi, s) => {
+    const dst = gridCount + s;
+    parentPositions[3 * dst] = parentPositions[3 * gi]!;
+    parentPositions[3 * dst + 1] = parentPositions[3 * gi + 1]!;
+    parentPositions[3 * dst + 2] = parentPositions[3 * gi + 2]!;
+  });
 
   // Indices: N² grid quads + one quad per skirt edge segment (4*TILE_QUADS
   // segments, since the ring is a closed loop of 4*TILE_QUADS vertices).
@@ -99,5 +147,5 @@ export function buildTileMesh(t: TileId, elevationsM: Float32Array, inputs: Tile
   const gridIndexCount = 6 * TILE_QUADS * TILE_QUADS;
   const skirtSourceIndices = Uint32Array.from(ring);
 
-  return { positions, colors, indices, originBf, gridIndexCount, skirtSourceIndices };
+  return { positions, colors, indices, originBf, parentPositions, gridIndexCount, skirtSourceIndices };
 }

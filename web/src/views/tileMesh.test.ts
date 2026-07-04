@@ -3,7 +3,7 @@ import { TILE_QUADS, tileCenterUnit, tileEdgeLenM, type TileId } from './cubeSph
 import { buildTileMesh, type TileMeshInputs } from './tileMesh';
 
 const R = 6.371e6;
-const inputs: TileMeshInputs = { radiusM: R, reliefM: 6000, classTint: [155, 143, 122], dead: false };
+const inputs: TileMeshInputs = { radiusM: R, reliefM: 6000, classTint: [155, 143, 122], dead: false, verticalScale: 1 };
 const t: TileId = { face: 0, level: 6, ix: 30, iy: 31 };
 const n = TILE_QUADS + 1;
 const gridCount = n * n;
@@ -108,5 +108,61 @@ describe('buildTileMesh', () => {
     const skirtNormal = cross(sub(sp1, sp0), sub(sp2, sp0));
     const skirtOutward = unit(sp0);
     expect(dot(unit(skirtNormal), skirtOutward)).toBeGreaterThan(-0.5);
+  });
+
+  it('verticalScale scales displacement but not colors', () => {
+    const e = new Float32Array(gridCount).fill(1000);
+    const flatIn = { ...inputs, verticalScale: 1 };
+    const tallIn = { ...inputs, verticalScale: 3 };
+    const m1 = buildTileMesh(t, e, flatIn);
+    const m3 = buildTileMesh(t, e, tallIn);
+    const o = m3.originBf;
+    const r3 = Math.hypot(o[0] + m3.positions[0]!, o[1] + m3.positions[1]!, o[2] + m3.positions[2]!);
+    expect(r3).toBeCloseTo(R + 3000, 3);
+    // colors identical: physical palette, not exaggerated
+    expect(Array.from(m3.colors.slice(0, 12))).toEqual(Array.from(m1.colors.slice(0, 12)));
+  });
+
+  it('aParentPos: even-even vertices equal their own position', () => {
+    const e = new Float32Array(gridCount).map(() => Math.random() * 2000);
+    const m = buildTileMesh(t, e, { ...inputs, verticalScale: 1 });
+    const n = TILE_QUADS + 1;
+    for (const [r, c] of [[0, 0], [2, 4], [64, 64], [32, 0]] as const) {
+      const i = r * n + c;
+      expect(m.parentPositions[3 * i]).toBe(m.positions[3 * i]);
+      expect(m.parentPositions[3 * i + 1]).toBe(m.positions[3 * i + 1]);
+      expect(m.parentPositions[3 * i + 2]).toBe(m.positions[3 * i + 2]);
+    }
+  });
+
+  it('aParentPos: odd vertices are midpoints of their even neighbors', () => {
+    const e = new Float32Array(gridCount).map(() => Math.random() * 2000);
+    const m = buildTileMesh(t, e, { ...inputs, verticalScale: 1 });
+    const n = TILE_QUADS + 1;
+    const at = (i: number, k: number) => m.positions[3 * i + k]!;
+    // Precision 1 (not the brief's literal 4): tile-local coordinates at
+    // this level run to ~1e5 m, so a single float32 rounding step when
+    // storing the averaged midpoint (unavoidable — parentPositions is a
+    // Float32Array) can be ~0.01-0.02 m, which already exceeds a 1e-4
+    // tolerance. Precision 1 (0.05 m) comfortably clears that rounding
+    // noise while still being a tight relational check.
+    // even row, odd col
+    let i = 2 * n + 5;
+    for (let k = 0; k < 3; k++) {
+      expect(m.parentPositions[3 * i + k]).toBeCloseTo((at(2 * n + 4, k) + at(2 * n + 6, k)) / 2, 1);
+    }
+    // odd row, odd col: diagonal midpoint
+    i = 3 * n + 5;
+    for (let k = 0; k < 3; k++) {
+      expect(m.parentPositions[3 * i + k]).toBeCloseTo((at(2 * n + 4, k) + at(4 * n + 6, k)) / 2, 1);
+    }
+  });
+
+  it('skirt vertices copy their source parent position', () => {
+    const e = new Float32Array(gridCount).fill(500);
+    const m = buildTileMesh(t, e, { ...inputs, verticalScale: 1 });
+    // first skirt vertex sources grid vertex 0 (ring starts at row 0, col 0)
+    const s = gridCount;
+    expect(m.parentPositions[3 * s]).toBe(m.parentPositions[0]);
   });
 });
