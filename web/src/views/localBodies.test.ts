@@ -121,4 +121,16 @@ describe('buildLocalBodies', () => {
     lb.group.traverse((o) => { if (o !== lb.group) anything++; });
     expect(anything).toBe(0);
   });
+
+  it('dot and glow sprites carry a radial texture (no bare squares in the sky)', () => {
+    const { lb } = updated();
+    let checked = 0;
+    lb.group.traverse((o) => {
+      const s = o as THREE.Sprite;
+      if (!s.isSprite) return;
+      expect((s.material as THREE.SpriteMaterial).map).not.toBeNull();
+      checked++;
+    });
+    expect(checked).toBeGreaterThan(0);
+  });
 });

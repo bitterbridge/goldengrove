@@ -47,6 +47,27 @@ export function buildLocalBodies(sim: Sim): LocalBodies {
   group.name = 'local-bodies';
 
   const unitSphere = new THREE.SphereGeometry(1, 24, 16);
+  // Soft radial falloff shared by dots and glows: a bare SpriteMaterial
+  // renders as a solid SQUARE. DataTexture (not canvas) so the texture also
+  // exists in headless test environments.
+  const radialTex = (() => {
+    const size = 64;
+    const data = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = (x + 0.5) / size - 0.5;
+        const dy = (y + 0.5) / size - 0.5;
+        const r = Math.min(1, Math.hypot(dx, dy) * 2);
+        const a = Math.round(255 * (1 - r) * (1 - r));
+        const o = (y * size + x) * 4;
+        data[o] = data[o + 1] = data[o + 2] = 255;
+        data[o + 3] = a;
+      }
+    }
+    const tex = new THREE.DataTexture(data, size, size);
+    tex.needsUpdate = true;
+    return tex;
+  })();
   const meshes: THREE.Mesh[] = [];
   const dots: THREE.Sprite[] = [];
   const glows: (THREE.Sprite | null)[] = [];
@@ -78,7 +99,7 @@ export function buildLocalBodies(sim: Sim): LocalBodies {
     meshes.push(mesh);
     radii.push(bodyRadiusM(desc, ref));
 
-    const dotMat = new THREE.SpriteMaterial({ color: colorHex, transparent: true, opacity: 0.9, depthWrite: false });
+    const dotMat = new THREE.SpriteMaterial({ map: radialTex, color: colorHex, transparent: true, opacity: 0.9, depthWrite: false });
     const dot = new THREE.Sprite(dotMat);
     dot.name = `local-dot-${i}`;
     dot.frustumCulled = false;
@@ -89,6 +110,7 @@ export function buildLocalBodies(sim: Sim): LocalBodies {
 
     if (isStar) {
       const glowMat = new THREE.SpriteMaterial({
+        map: radialTex,
         color: colorHex,
         transparent: true,
         opacity: 0.5,
@@ -232,6 +254,7 @@ export function buildLocalBodies(sim: Sim): LocalBodies {
       if (star) group.remove(star.light);
     });
     unitSphere.dispose();
+    radialTex.dispose();
   }
 
   return { group, labels, update, dispose };
