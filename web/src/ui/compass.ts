@@ -20,7 +20,9 @@ export function buildCompass(root: HTMLElement): Compass {
     const mark = document.createElement('span');
     mark.className = 'compass-mark';
     const norm = ((d % 360) + 360) % 360;
-    mark.textContent = norm % 90 === 0 ? WINDS[(norm / 45) % 8]! : norm % 45 === 0 ? WINDS[(norm / 45) % 8]! : '·';
+    const isCardinal = norm % 90 === 0;
+    mark.textContent = norm % 45 === 0 ? WINDS[(norm / 45) % 8]! : '·';
+    if (isCardinal) mark.classList.add('cardinal');
     mark.style.left = `${(d + 360) * PX_PER_DEG}px`;
     tape.appendChild(mark);
   }
@@ -40,7 +42,9 @@ export function buildCompass(root: HTMLElement): Compass {
       tape.style.transform = `translateX(${-(deg + 360) * PX_PER_DEG + 144}px)`;
       const wind = WINDS[Math.round(deg / 45) % 8]!;
       const pitchDeg = (pitchRad * 180) / Math.PI;
-      readout.textContent = `${wind} ${deg.toFixed(0)}° · ${pitchDeg >= 0 ? '+' : ''}${pitchDeg.toFixed(0)}°`;
+      const p = Math.round(pitchDeg) + 0;
+      const sign = p >= 0 ? '+' : '';
+      readout.textContent = `${wind} ${deg.toFixed(0)}° · ${sign}${p}°`;
     },
     setVisible(v) {
       box.style.display = v ? '' : 'none';
