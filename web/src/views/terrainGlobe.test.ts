@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { parseDescriptor } from '../sim/parse';
-import { bodyLayout } from '../sim/layout';
+import { bodyLayout, bodyRadiusM } from '../sim/layout';
 import type { Sim } from '../sim/wasm';
 import { TILE_QUADS } from './cubeSphere';
 import { buildTerrainGlobe } from './terrainGlobe';
@@ -223,5 +223,71 @@ describe('buildTerrainGlobe', () => {
     // standing on a 2000 m peak at eye height 2 m must refine exactly as
     // deep as standing at sea level at eye height 2 m.
     expect(high.stats().deepestBuilt).toBe(flat.stats().deepestBuilt);
+  });
+
+  it('terrain tiles carry aParentPos and a per-tile morph uniform', () => {
+    const g = buildTerrainGlobe(fakeSim(), anchorBody)!;
+    for (let f = 0; f < 40; f++) g.update(15, 30, 252, 2, suns, 8);
+    let checked = 0;
+    g.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || !m.visible || (m.material as THREE.Material).transparent) return;
+      expect(m.geometry.getAttribute('aParentPos')).toBeTruthy();
+      expect(m.userData.uMorph).toBeTruthy();
+      checked++;
+    });
+    expect(checked).toBeGreaterThan(3);
+  });
+
+  it('uMorph rises with distance: far tiles morph toward the parent shape', () => {
+    const g = buildTerrainGlobe(fakeSim(), anchorBody)!;
+    for (let f = 0; f < 60; f++) g.update(15, 30, 252, 2, suns, 8);
+    const morphs: number[] = [];
+    g.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && m.visible && m.userData.uMorph) morphs.push(m.userData.uMorph.value as number);
+    });
+    expect(Math.max(...morphs)).toBeGreaterThan(0.5); // outer-band tiles well into their morph
+    expect(Math.min(...morphs)).toBeLessThan(0.5); // underfoot tiles barely morphed
+  });
+
+  it('reliefScale=3 raises the rendered surface but not water', () => {
+    const ref = bodyLayout(golden)[anchorBody]!;
+    const R = ref.kind === 'star' ? 0 : bodyRadiusM(golden, ref);
+
+    // Constant +1000 m elevation everywhere (an ocean world, but never
+    // dipping below sea level here): isolates the vertical-scale check on
+    // dry terrain from the water path.
+    const land = buildTerrainGlobe(fakeConstantElevationSim(1000), anchorBody, 3)!;
+    for (let f = 0; f < 40; f++) land.update(15, 30, 1000, 2, suns, 8);
+    let terrainMesh: THREE.Mesh | undefined;
+    land.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!terrainMesh && m.isMesh && m.visible) terrainMesh = m;
+    });
+    expect(terrainMesh).toBeDefined();
+    const to = terrainMesh!.userData.originBf as [number, number, number];
+    const tp = terrainMesh!.geometry.getAttribute('position');
+    const tx = to[0] + tp.getX(0), ty = to[1] + tp.getY(0), tz = to[2] + tp.getZ(0);
+    const terrainRadius = Math.hypot(tx, ty, tz);
+    expect(Math.abs(terrainRadius - (R + 3000))).toBeLessThan(1); // R + 1000 elevM * 3 reliefScale
+
+    // Same ocean world, queried where elevation dips below sea level (the
+    // scenario the existing "ocean worlds get translucent water meshes"
+    // test already exercises): water is built flat at sea level regardless
+    // of reliefScale, so its vertex radius must stay ≈ R.
+    const ocean = buildTerrainGlobe(fakeSim(), anchorBody, 3)!;
+    for (let f = 0; f < 40; f++) ocean.update(-30, 30, 0, 252, suns, 8);
+    let waterMesh: THREE.Mesh | undefined;
+    ocean.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!waterMesh && m.isMesh && m.visible && (m.material as THREE.Material).transparent) waterMesh = m;
+    });
+    expect(waterMesh).toBeDefined();
+    const wo = waterMesh!.userData.originBf as [number, number, number];
+    const wp = waterMesh!.geometry.getAttribute('position');
+    const wx = wo[0] + wp.getX(0), wy = wo[1] + wp.getY(0), wz = wo[2] + wp.getZ(0);
+    const waterRadius = Math.hypot(wx, wy, wz);
+    expect(Math.abs(waterRadius - R)).toBeLessThan(1);
   });
 });

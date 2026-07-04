@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { bodyLayout, bodyRadiusM } from '../sim/layout';
 import type { Sim } from '../sim/wasm';
 import type { SunSpec } from './sky';
-import { tileGrid, tileKey, type TileId, TILE_QUADS } from './cubeSphere';
+import { tileGrid, tileKey, tileEdgeLenM, tileCenterUnit, type TileId, TILE_QUADS } from './cubeSphere';
 import { TileTree } from './tileTree';
 import { buildTileMesh, type TileMeshData } from './tileMesh';
 
@@ -35,7 +35,26 @@ export interface TerrainGlobe {
 const PALETTE = { Rocky: 0x9b8f7a, IceGiant: 0x7ec8e3, GasGiant: 0xd8b27a } as const;
 const MOON_TINT = 0x8a8f98;
 
-export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | null {
+// splitK 1.7 keeps the steady-state active set near ~100-200 tiles
+// (~1-1.6 M triangles); splitK 3 would triple that. cacheCap must
+// comfortably exceed the active set or the cache thrashes. Shared with the
+// per-frame CDLOD morph math below, which needs the exact same split
+// distance the tree used to decide whether a tile would refine further.
+const SPLIT_K = 1.7;
+
+/** One GLSL program shared by every cloned terrain material (three.js keys
+ * compiled programs by customProgramCacheKey); without this each per-tile
+ * material clone would trigger its own shader compile. */
+const MORPH_PROGRAM_CACHE_KEY = 'gg-morph';
+
+function injectMorphShader(shader: THREE.WebGLProgramParametersWithUniforms, uMorph: { value: number }): void {
+  shader.uniforms.uMorph = uMorph;
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nattribute vec3 aParentPos;\nuniform float uMorph;')
+    .replace('#include <begin_vertex>', 'vec3 transformed = mix(vec3(position), aParentPos, uMorph);');
+}
+
+export function buildTerrainGlobe(sim: Sim, bodyIndex: number, reliefScale = 3): TerrainGlobe | null {
   const info = sim.bodyTerrainInfo(bodyIndex);
   if (!info) return null;
   const desc = sim.descriptor;
@@ -58,10 +77,7 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
     color: 0x1c4a78, transparent: true, opacity: 0.82, roughness: 0.35, metalness: 0,
   });
   const hasOcean = info.ocean_fraction > 0;
-  // splitK 1.7 keeps the steady-state active set near ~100-200 tiles
-  // (~1-1.6 M triangles); splitK 3 would triple that. cacheCap must
-  // comfortably exceed the active set or the cache thrashes.
-  const tree = new TileTree({ radiusM, splitK: 1.7, cacheCap: 480 });
+  const tree = new TileTree({ radiusM, splitK: SPLIT_K, cacheCap: 480 });
   const meshes = new Map<string, THREE.Mesh>();
   const waterMeshes = new Map<string, THREE.Mesh>();
   let pendingBuilds = 0;
@@ -98,14 +114,25 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
     }
     const elevs = sim.bodyElevations(bodyIndex, coords);
     if (elevs.length !== n) return; // non-terrain body (shouldn't happen here)
-    const data = buildTileMesh(t, elevs, { radiusM, reliefM: info!.relief_m, classTint, dead, verticalScale: 1 });
+    const data = buildTileMesh(t, elevs, { radiusM, reliefM: info!.relief_m, classTint, dead, verticalScale: reliefScale });
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(data.colors, 3));
+    geo.setAttribute('aParentPos', new THREE.BufferAttribute(data.parentPositions, 3));
     geo.setIndex(new THREE.BufferAttribute(data.indices, 1));
     computeGridOnlyNormals(geo, data);
-    const mesh = new THREE.Mesh(geo, material);
+
+    // Per-tile cloned material: each tile needs its own uMorph uniform, but
+    // all clones share ONE compiled GLSL program (customProgramCacheKey) so
+    // cloning doesn't multiply shader compiles.
+    const tileMat = material.clone();
+    tileMat.customProgramCacheKey = () => MORPH_PROGRAM_CACHE_KEY;
+    const uMorph = { value: 0 };
+    tileMat.onBeforeCompile = (shader) => injectMorphShader(shader, uMorph);
+
+    const mesh = new THREE.Mesh(geo, tileMat);
     mesh.userData.originBf = data.originBf;
+    mesh.userData.uMorph = uMorph;
     mesh.visible = false;
     mesh.frustumCulled = false; // tiles are selected CPU-side; sphere-scale bounds confuse three's culler
     scene.add(mesh);
@@ -173,6 +200,7 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
       const m = meshes.get(key);
       if (m) {
         m.geometry.dispose();
+        (m.material as THREE.Material).dispose(); // per-tile cloned material
         scene.remove(m);
         meshes.delete(key);
       }
@@ -194,16 +222,29 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
     ).transpose();
     const q = new THREE.Quaternion().setFromRotationMatrix(basis);
 
-    const active = new Set(render.map(tileKey));
+    const activeTiles = new Map(render.map((t) => [tileKey(t), t]));
     for (const [key, mesh] of meshes) {
-      const on = active.has(key);
-      mesh.visible = on;
-      if (!on) continue;
+      const t = activeTiles.get(key);
+      mesh.visible = t !== undefined;
+      if (!t) continue;
       const o = mesh.userData.originBf as [number, number, number];
       // f64 subtraction BEFORE the f32 assignment: this is the RTC step
       mesh.position.set(o[0] - camBf[0], o[1] - camBf[1], o[2] - camBf[2]);
       mesh.quaternion.copy(q);
       mesh.position.applyQuaternion(q);
+
+      // CDLOD geomorphing: morph this tile toward its parent's shape as the
+      // camera nears the distance at which the tile's PARENT would split
+      // into it — smoothing the LOD transition instead of popping. Measured
+      // against the undisplaced sphere and the LOD camera point, mirroring
+      // the split predicate in TileTree.update exactly (same camBfLod).
+      const uMorph = mesh.userData.uMorph as { value: number } | undefined;
+      if (uMorph) {
+        const c = tileCenterUnit(t);
+        const d = Math.hypot(camBfLod[0] - c[0] * radiusM, camBfLod[1] - c[1] * radiusM, camBfLod[2] - c[2] * radiusM);
+        const splitDist = SPLIT_K * tileEdgeLenM(t.level, radiusM);
+        uMorph.value = THREE.MathUtils.smoothstep(d, 0.7 * splitDist, 0.95 * splitDist);
+      }
 
       const wm = waterMeshes.get(key);
       if (wm) {
@@ -215,7 +256,7 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
       }
     }
     for (const [key, wm] of waterMeshes) {
-      if (!active.has(key)) wm.visible = false;
+      if (!activeTiles.has(key)) wm.visible = false;
     }
 
     // sun lights: same directions as the sky pass, but terrain lighting
@@ -243,10 +284,11 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
   function dispose(): void {
     for (const [, mesh] of meshes) {
       mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose(); // per-tile cloned material
       scene.remove(mesh);
     }
     meshes.clear();
-    material.dispose();
+    material.dispose(); // shared base material the clones were made from
     for (const [, wm] of waterMeshes) {
       wm.geometry.dispose();
       scene.remove(wm);
