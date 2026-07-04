@@ -44,11 +44,16 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
   sunLights.forEach((l) => scene.add(l));
 
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0, metalness: 0 });
+  const waterMaterial = new THREE.MeshStandardMaterial({
+    color: 0x1c4a78, transparent: true, opacity: 0.82, roughness: 0.35, metalness: 0,
+  });
+  const hasOcean = info.ocean_fraction > 0;
   // splitK 1.7 keeps the steady-state active set near ~100-200 tiles
   // (~1-1.6 M triangles); splitK 3 would triple that. cacheCap must
   // comfortably exceed the active set or the cache thrashes.
   const tree = new TileTree({ radiusM, splitK: 1.7, cacheCap: 480 });
   const meshes = new Map<string, THREE.Mesh>();
+  const waterMeshes = new Map<string, THREE.Mesh>();
   let pendingBuilds = 0;
 
   function buildTile(t: TileId): void {
@@ -73,6 +78,25 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
     mesh.frustumCulled = false; // tiles are selected CPU-side; sphere-scale bounds confuse three's culler
     scene.add(mesh);
     meshes.set(tileKey(t), mesh);
+
+    if (hasOcean) {
+      let dipsBelow = false;
+      for (let i = 0; i < elevs.length; i++) if (elevs[i]! < 0) { dipsBelow = true; break; }
+      if (dipsBelow) {
+        const flat = new Float32Array(elevs.length); // all zeros = sea level
+        const w = buildTileMesh(t, flat, { radiusM, reliefM: info!.relief_m, classTint, dead });
+        const wg = new THREE.BufferGeometry();
+        wg.setAttribute('position', new THREE.BufferAttribute(w.positions, 3));
+        wg.setIndex(new THREE.BufferAttribute(w.indices, 1));
+        wg.computeVertexNormals();
+        const wm = new THREE.Mesh(wg, waterMaterial);
+        wm.userData.originBf = w.originBf;
+        wm.visible = false;
+        wm.frustumCulled = false;
+        scene.add(wm);
+        waterMeshes.set(tileKey(t), wm);
+      }
+    }
     tree.markBuilt(tileKey(t));
   }
 
@@ -100,6 +124,12 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
         scene.remove(m);
         meshes.delete(key);
       }
+      const wm = waterMeshes.get(key);
+      if (wm) {
+        wm.geometry.dispose();
+        scene.remove(wm);
+        waterMeshes.delete(key);
+      }
     }
     for (const t of build.slice(0, buildBudget)) buildTile(t);
     pendingBuilds = Math.max(0, build.length - buildBudget);
@@ -122,6 +152,18 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
       mesh.position.set(o[0] - camBf[0], o[1] - camBf[1], o[2] - camBf[2]);
       mesh.quaternion.copy(q);
       mesh.position.applyQuaternion(q);
+
+      const wm = waterMeshes.get(key);
+      if (wm) {
+        wm.visible = true;
+        const wo = wm.userData.originBf as [number, number, number];
+        wm.position.set(wo[0] - camBf[0], wo[1] - camBf[1], wo[2] - camBf[2]);
+        wm.quaternion.copy(q);
+        wm.position.applyQuaternion(q);
+      }
+    }
+    for (const [key, wm] of waterMeshes) {
+      if (!active.has(key)) wm.visible = false;
     }
 
     // sun lights: same directions as the sky pass, but terrain lighting
@@ -146,6 +188,12 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
     }
     meshes.clear();
     material.dispose();
+    for (const [, wm] of waterMeshes) {
+      wm.geometry.dispose();
+      scene.remove(wm);
+    }
+    waterMeshes.clear();
+    waterMaterial.dispose();
   }
 
   return { scene, update, stats: () => ({ built: meshes.size, pendingBuilds }), dispose };

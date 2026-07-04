@@ -86,6 +86,40 @@ describe('buildTerrainGlobe', () => {
     expect(meshesAfter).toBe(0);
   });
 
+  it('ocean worlds get translucent water meshes on tiles that dip below sea level', () => {
+    const g = buildTerrainGlobe(fakeSim(), anchorBody)!;
+    for (let f = 0; f < 40; f++) g.update(-30, 30, 252, suns, 8); // southern hemisphere: elevations < 0
+    const water: THREE.Mesh[] = [];
+    g.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && (m.material as THREE.Material).transparent) water.push(m);
+    });
+    expect(water.length).toBeGreaterThan(0);
+    // water sits at sea level: vertex radius ≈ R (position + origin round-trip)
+  });
+
+  it('dry worlds get no water meshes', () => {
+    const sim = fakeSim();
+    const dry = { ...sim, bodyTerrainInfo: (i: number) => (i === 0 ? null : { sea_level: 0, ocean_fraction: 0, relief_m: 6000, plate_count: 8 }) };
+    const g = buildTerrainGlobe(dry as Sim, anchorBody)!;
+    for (let f = 0; f < 40; f++) g.update(-30, 30, 252, suns, 8);
+    let transparent = 0;
+    g.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && (m.material as THREE.Material).transparent) transparent++;
+    });
+    expect(transparent).toBe(0);
+  });
+
+  it('dispose also removes water meshes', () => {
+    const g = buildTerrainGlobe(fakeSim(), anchorBody)!;
+    for (let f = 0; f < 40; f++) g.update(-30, 30, 252, suns, 8);
+    g.dispose();
+    let meshes = 0;
+    g.scene.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes++; });
+    expect(meshes).toBe(0);
+  });
+
   it('has sun lights that fade below the horizon (ground darkens at night)', () => {
     const g = buildTerrainGlobe(fakeSim(), anchorBody)!;
     const intensityTotal = () => {
