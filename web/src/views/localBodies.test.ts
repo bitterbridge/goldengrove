@@ -102,6 +102,18 @@ describe('buildLocalBodies', () => {
     expect(dots + meshes).toBeGreaterThan(5);
   });
 
+  it('hides non-star labels below the horizon, shows them above', () => {
+    const { lb } = updated();
+    // fixture geometry (lon 0 ⇒ up = +x): body index 2 (planet 0) sits at
+    // smaller x than the observer (anchorBody = 3) ⇒ ENU dir z ≈ -1, well
+    // below the -0.12 rad horizon gate — mirrors the old dome's below-horizon
+    // hiding, which the new true-position view must preserve.
+    expect(lb.labels[2]!.visible).toBe(false);
+    // body index 4 (planet 2) sits at larger x ⇒ ENU dir z ≈ +1, above the
+    // horizon — its (non-star) label stays visible.
+    expect(lb.labels[4]!.visible).toBe(true);
+  });
+
   it('dispose empties the group', () => {
     const { lb } = updated();
     lb.dispose();

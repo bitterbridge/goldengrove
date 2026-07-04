@@ -198,6 +198,12 @@ async function boot(): Promise<void> {
     yaw = 0;
     pitch = 0.15;
     flightAltM = Math.max(0, current.alt ?? 0);
+    // consume-once: later ground entries start on foot. current.alt only ever
+    // carries a value parsed from a shared URL at boot; without clearing it
+    // here, every later stand-here / view toggle would re-teleport back to
+    // that boot-time altitude. syncUrl() below writes flightAltM back out for
+    // sharing, so the URL round-trip stays intact.
+    current.alt = null;
     const states0 = sim.statesAt(clock.t);
     const states60 = sim.statesAt(clock.t + 60);
     standingSpinRate = spinRateRadPerS(states0[body * 7 + 6]!, states60[body * 7 + 6]!, 60);

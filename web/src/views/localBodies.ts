@@ -186,7 +186,11 @@ export function buildLocalBodies(sim: Sim): LocalBodies {
       dot.visible = !showMesh;
       const dotSize = dist * (DOT_TARGET_PX / pxPerRad);
       dot.scale.set(dotSize, dotSize, 1);
-      label.visible = ref.kind !== 'star';
+      // Below-horizon gate, carried over from the old fixed-dome sky: without
+      // it, labels of occluded (below-horizon) bodies float visibly over the
+      // terrain. Stars stay excluded from labels entirely, as before.
+      const meshOrDotVisible = mesh.visible || dot.visible;
+      label.visible = meshOrDotVisible && ref.kind !== 'star' && ez > -0.12;
 
       if (glow) {
         glow.visible = true; // always-on, never gated by apparent size or horizon
