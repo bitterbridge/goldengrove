@@ -31,6 +31,8 @@ function fakeSim(): Sim {
     hostOriginAt: () => new Float64Array(3),
     bodyHeightmap: () => new Float32Array(0),
     bodyTerrainInfo: () => null,
+    bodyElevation: () => 0,
+    bodyElevations: (_: number, coords: Float64Array) => new Float32Array(coords.length / 2),
   };
 }
 

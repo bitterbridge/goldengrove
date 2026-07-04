@@ -117,4 +117,27 @@ impl World {
             None => Err(JsError::new("no terrain for this body")),
         })
     }
+
+    /// Fine elevation (METERS above sea level) at a surface point.
+    /// Error for bodies with no terrain (stars, giants).
+    pub fn body_elevation(
+        &self,
+        body_index: usize,
+        lat_deg: f64,
+        lon_deg: f64,
+    ) -> Result<f64, JsError> {
+        self.with_terrain(body_index, |spec| match spec {
+            Some(s) => Ok(s.elevation_fine(lat_deg, lon_deg)),
+            None => Err(JsError::new("no terrain for this body")),
+        })
+    }
+
+    /// Batched fine elevations: coords = [lat0, lon0, lat1, lon1, ...] deg.
+    /// Empty array = no terrain body (renderer skips), matching body_heightmap.
+    pub fn body_elevations(&self, body_index: usize, coords: &[f64]) -> js_sys::Float32Array {
+        self.with_terrain(body_index, |spec| match spec {
+            Some(s) => js_sys::Float32Array::from(s.elevation_fine_batch(coords).as_slice()),
+            None => js_sys::Float32Array::new_with_length(0),
+        })
+    }
 }

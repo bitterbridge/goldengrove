@@ -25,6 +25,8 @@ function countingSim(seed: string): { sim: Sim; calls: () => number } {
       n++;
       return i >= golden.stars.length ? { sea_level: 0, ocean_fraction: 0.5, relief_m: 5000, plate_count: 8 } : null;
     },
+    bodyElevation: () => 0,
+    bodyElevations: (_: number, coords: Float64Array) => new Float32Array(coords.length / 2),
   };
   return { sim, calls: () => n };
 }

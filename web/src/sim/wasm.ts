@@ -12,6 +12,10 @@ export interface Sim {
   hostOriginAt(tS: number): Float64Array;
   bodyHeightmap(bodyIndex: number, width: number, height: number): Float32Array; // length 0 => no terrain
   bodyTerrainInfo(bodyIndex: number): TerrainInfo | null; // null => no terrain
+  /** Fine elevation in meters above sea level; null for non-terrain bodies. */
+  bodyElevation(bodyIndex: number, latDeg: number, lonDeg: number): number | null;
+  /** Batched fine elevations for [lat0, lon0, ...] pairs; length 0 for non-terrain bodies. */
+  bodyElevations(bodyIndex: number, coords: Float64Array): Float32Array;
 }
 
 let wasmReady: Promise<unknown> | null = null;
@@ -45,5 +49,13 @@ export async function loadSim(seed: string): Promise<Sim> {
         return null;
       }
     },
+    bodyElevation: (i, latDeg, lonDeg) => {
+      try {
+        return world.body_elevation(i, latDeg, lonDeg);
+      } catch {
+        return null;
+      }
+    },
+    bodyElevations: (i, coords) => world.body_elevations(i, coords),
   };
 }

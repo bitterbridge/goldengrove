@@ -70,6 +70,26 @@ fn fine_grid(spec: &gg_terrain::TerrainSpec) -> Vec<f32> {
 }
 
 #[wasm_bindgen_test]
+fn body_elevation_scalar_and_batch_agree() {
+    let world = World::new("42").unwrap();
+    // anchor planet body index: stars.len() + anchor_planet, read from the descriptor JSON
+    let desc: serde_json::Value = serde_json::from_str(&world.descriptor_json().unwrap()).unwrap();
+    let body =
+        desc["stars"].as_array().unwrap().len() + desc["anchor_planet"].as_u64().unwrap() as usize;
+    let e = world.body_elevation(body, 10.0, 20.0).unwrap();
+    assert!(
+        e.is_finite() && e.abs() < 50_000.0,
+        "implausible elevation {e}"
+    );
+    let batch = world.body_elevations(body, &[10.0, 20.0]);
+    assert_eq!(batch.length(), 1);
+    assert_eq!(batch.get_index(0), e as f32);
+    // star (body 0) has no terrain
+    assert!(world.body_elevation(0, 0.0, 0.0).is_err());
+    assert_eq!(world.body_elevations(0, &[0.0, 0.0]).length(), 0);
+}
+
+#[wasm_bindgen_test]
 fn junk_seeds_error_cleanly() {
     for bad in ["banana", "", "-5", "0x2a", "18446744073709551616"] {
         assert!(World::new(bad).is_err(), "seed {bad:?} should be rejected");
