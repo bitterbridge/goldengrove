@@ -20,6 +20,14 @@ describe('compass', () => {
     c.setHeading(0.1, 0);
     expect(root.querySelector('.compass-readout')!.textContent).toBe(a);
   });
+  it('appends a position suffix only when latLon is passed', () => {
+    const root = document.createElement('div');
+    const c = buildCompass(root);
+    c.setHeading(0, 0, { latDeg: 12.04, lonDeg: -176.44 });
+    expect(root.querySelector('.compass-readout')!.textContent).toBe('N 0° · +0° · 12.0°N 176.4°W');
+    c.setHeading(0, 0);
+    expect(root.querySelector('.compass-readout')!.textContent).toBe('N 0° · +0°');
+  });
   it('is hidden until standing', () => {
     const root = document.createElement('div');
     const c = buildCompass(root);

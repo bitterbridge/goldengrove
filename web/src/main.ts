@@ -6,7 +6,8 @@ import { SimClock } from './time/clock';
 import { buildSpaceScene, type SpaceView } from './views/space';
 import { buildGroundScene, type GroundView } from './views/ground';
 import { pointToLatLon, type Vec3 } from './views/observer';
-import { bodyLayout, standableBody } from './sim/layout';
+import { stepLatLon } from './views/walk';
+import { bodyLayout, parentIndex, standableBody } from './sim/layout';
 import { buildHud, formatDate } from './ui/hud';
 import { buildCompass } from './ui/compass';
 import { randomSeed } from './ui/seed';
@@ -88,15 +89,17 @@ async function boot(): Promise<void> {
     onTrueScale: (on) => { trueScale = on; },
     onReroll: () => { location.hash = `seed=${randomSeed()}`; },
     onShare: () => {
-      const hash = serializeAppState({ ...current, t: clock.t, speed: clock.speed, body: focused });
-      history.replaceState(null, '', hash);
-      void navigator.clipboard.writeText(`${location.origin}${location.pathname}${hash}`);
+      syncUrl();
+      void navigator.clipboard.writeText(`${location.origin}${location.pathname}${location.hash}`);
       hud.flashShared();
     },
     onDateJump: (year, day) => { clock.t = timeAtDate(anchorCal, year, day); },
     onToggleView: () => {
-      if (current.view === 'space') enterGround(focused ?? anchorBody, current.lat ?? 15, current.lon ?? 0);
-      else exitGround();
+      if (current.view === 'space') {
+        const body = focused ?? anchorBody;
+        const d = defaultStandPoint(body);
+        enterGround(body, d.latDeg, d.lonDeg);
+      } else exitGround();
     },
   });
   hud.setActiveSpeed(clock.speed);
@@ -110,6 +113,29 @@ async function boot(): Promise<void> {
       const standable = focused !== null && standableBody(sim.descriptor, layout[focused]!);
       hud.setViewButton('⏚ stand here', standable);
     }
+  }
+
+  function syncUrl(): void {
+    // Keep the address bar shareable at all times (replaceState never fires
+    // hashchange, so this can't trigger the reload listener). The share
+    // button remains the way to capture the exact MOMENT (current t).
+    history.replaceState(null, '', serializeAppState({ ...current, t: clock.t, speed: clock.speed, body: focused }));
+  }
+
+  function defaultStandPoint(body: number): { latDeg: number; lonDeg: number } {
+    const ref = layout[body]!;
+    if (ref.kind !== 'moon') return { latDeg: 15, lonDeg: 0 };
+    // Stand at the sub-parent point: the spot where the planet hangs at the
+    // zenith (for locked moons it stays there — the natural balcony).
+    const st = sim.statesAt(clock.t);
+    const p = parentIndex(layout, sim.descriptor, body)!;
+    const dir: Vec3 = [
+      st[p * 7]! - st[body * 7]!,
+      st[p * 7 + 1]! - st[body * 7 + 1]!,
+      st[p * 7 + 2]! - st[body * 7 + 2]!,
+    ];
+    const axis: Vec3 = [st[body * 7 + 3]!, st[body * 7 + 4]!, st[body * 7 + 5]!];
+    return pointToLatLon(dir, axis, st[body * 7 + 6]!);
   }
 
   function hideAllLabels(): void {
@@ -133,6 +159,7 @@ async function boot(): Promise<void> {
     compass.setVisible(true);
     if (clock.speed > 3600) { clock.speed = 3600; hud.setActiveSpeed(3600); }
     hud.setMaxSpeed(3600);
+    syncUrl();
   }
   function exitGround(): void {
     hideAllLabels();
@@ -140,6 +167,7 @@ async function boot(): Promise<void> {
     current.view = 'space';
     refreshViewButton();
     hud.setMaxSpeed(null);
+    syncUrl();
   }
 
   function resize(): void {
@@ -166,7 +194,7 @@ async function boot(): Promise<void> {
     if (current.view !== 'ground' || !dragging) return;
     yaw -= e.movementX * 0.0032;
     pitch = Math.min(Math.PI / 2 - 0.01, Math.max(-0.45, pitch + e.movementY * 0.0032));
-    compass.setHeading(yaw, pitch);
+    compass.setHeading(yaw, pitch, { latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 });
   });
   renderer.domElement.addEventListener('pointerup', (e) => {
     if (current.view !== 'space') return;
@@ -205,6 +233,29 @@ async function boot(): Promise<void> {
     else { focused = null; refreshViewButton(); }
   });
 
+  // Surface walking: W/↑ forward, S/↓ backward, A/← strafe left, D/→ strafe
+  // right, along the current compass heading; Shift for a 5x sprint.
+  const WALK_KEY: Record<string, 'w' | 'a' | 's' | 'd'> = {
+    w: 'w', a: 'a', s: 's', d: 'd',
+    arrowup: 'w', arrowleft: 'a', arrowdown: 's', arrowright: 'd',
+  };
+  const heldKeys = new Set<'w' | 'a' | 's' | 'd'>();
+  let shiftHeld = false;
+  const WALK_DEG_PER_S = 20;
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Shift') shiftHeld = true;
+    const mapped = WALK_KEY[e.key.toLowerCase()];
+    if (mapped) {
+      heldKeys.add(mapped);
+      e.preventDefault();
+    }
+  });
+  addEventListener('keyup', (e) => {
+    if (e.key === 'Shift') shiftHeld = false;
+    const mapped = WALK_KEY[e.key.toLowerCase()];
+    if (mapped && heldKeys.delete(mapped) && current.view === 'ground') syncUrl();
+  });
+
   refreshViewButton();
   // Prime the view once so the host origin is known, then frame the camera
   // on it (trinary systems can have the planet host far from world origin).
@@ -223,13 +274,27 @@ async function boot(): Promise<void> {
     const states = sim.statesAt(clock.t);
 
     if (current.view === 'ground' && current.body !== null) {
+      if (heldKeys.size > 0 && current.lat !== null && current.lon !== null) {
+        const speedMult = shiftHeld ? 5 : 1;
+        const step = WALK_DEG_PER_S * speedMult * dt;
+        let dF = 0, dR = 0; // forward, rightward relative to the compass heading
+        if (heldKeys.has('w')) dF += 1;
+        if (heldKeys.has('s')) dF -= 1;
+        if (heldKeys.has('d')) dR += 1;
+        if (heldKeys.has('a')) dR -= 1;
+        if (dF !== 0 || dR !== 0) {
+          const { latDeg, lonDeg } = stepLatLon(current.lat, current.lon, yaw, dF, dR, step);
+          current.lat = latDeg;
+          current.lon = lonDeg;
+        }
+      }
       ground.update(states, { body: current.body, latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 });
       groundCamera.position.set(0, 0, 0);
       groundCamera.lookAt(Math.sin(yaw) * Math.cos(pitch), Math.cos(yaw) * Math.cos(pitch), Math.sin(pitch));
       if (now - lastDateUpdate > 250) {
         lastDateUpdate = now;
         hud.setDate(formatDate(sim.anchorDate(clock.t), anchorCal));
-        compass.setHeading(yaw, pitch);
+        compass.setHeading(yaw, pitch, { latDeg: current.lat ?? 0, lonDeg: current.lon ?? 0 });
       }
       renderer.render(ground.scene, groundCamera);
       labelRenderer.render(ground.scene, groundCamera);
