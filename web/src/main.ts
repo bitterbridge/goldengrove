@@ -243,6 +243,7 @@ async function boot(): Promise<void> {
   let shiftHeld = false;
   const WALK_DEG_PER_S = 20;
   addEventListener('keydown', (e) => {
+    if (document.activeElement instanceof HTMLInputElement) return;
     if (e.key === 'Shift') shiftHeld = true;
     const mapped = WALK_KEY[e.key.toLowerCase()];
     if (mapped) {
@@ -251,10 +252,12 @@ async function boot(): Promise<void> {
     }
   });
   addEventListener('keyup', (e) => {
+    if (document.activeElement instanceof HTMLInputElement) return;
     if (e.key === 'Shift') shiftHeld = false;
     const mapped = WALK_KEY[e.key.toLowerCase()];
     if (mapped && heldKeys.delete(mapped) && current.view === 'ground') syncUrl();
   });
+  addEventListener('blur', () => { heldKeys.clear(); shiftHeld = false; });
 
   refreshViewButton();
   // Prime the view once so the host origin is known, then frame the camera
@@ -314,8 +317,10 @@ async function boot(): Promise<void> {
   // deep link straight into the ground view
   if (current.view === 'ground') {
     const body = current.body !== null && current.body < sim.bodyCount ? current.body : anchorBody;
-    if (standableBody(sim.descriptor, layout[body]!)) enterGround(body, current.lat ?? 15, current.lon ?? 0);
-    else exitGround();
+    if (standableBody(sim.descriptor, layout[body]!)) {
+      const d = defaultStandPoint(body);
+      enterGround(body, current.lat ?? d.latDeg, current.lon ?? d.lonDeg);
+    } else exitGround();
   }
 }
 
