@@ -365,13 +365,18 @@ impl TerrainSpec {
 
     /// Elevation in METERS above sea level with micro-detail octaves that
     /// continue the noise spectrum below heightmap resolution. The base
-    /// field is exactly elevation() (same draws, same values); micro adds
-    /// <0.7% of relief, so orrery textures and ground truth agree at
-    /// texture scale. The ground view and walking consume this.
+    /// field is exactly elevation() (same draws, same values); micro is
+    /// masked by relief (rough on mountains/trenches, calm on plains), so
+    /// orrery textures and ground truth agree at texture scale. The ground
+    /// view and walking consume this.
     pub fn elevation_fine(&self, lat_deg: f64, lon_deg: f64) -> f64 {
         let p = latlon_to_unit(lat_deg, lon_deg);
-        let rel = self.raw.raw_elevation(p) - self.sea_level + noise::micro(self.raw.noise_seed, p);
-        rel * self.relief_m
+        let base = self.raw.raw_elevation(p) - self.sea_level;
+        // Rough where the coarse field is dramatic (mountain belts, deep
+        // trenches), calm on plains and shelves. Continuous by construction:
+        // abs/min of continuous inputs, no positional branches.
+        let mask = 0.25 + 0.75 * (base.abs() / 0.8).min(1.0);
+        (base + mask * noise::micro(self.raw.noise_seed, p)) * self.relief_m
     }
 
     /// Batched elevation_fine: coords is [lat0, lon0, lat1, lon1, ...] in

@@ -71,17 +71,20 @@ pub fn warped_fbm(seed: u64, p: V3, octaves: u32) -> f64 {
     )
 }
 
-/// Micro-detail: continues the terrain detail cascade below heightmap
-/// resolution (wavelengths ~50 km down to ~45 m on an Earth-radius body).
-/// The joint amplitude equals what the detail fbm would give its next
-/// octave, so the spectrum has no seam; gain 0.6 (vs 0.5 above) keeps
-/// walking-scale ground from being glassy. 12 octaves for every body —
-/// small bodies just get sub-perceptual extra terms. Libm-free.
+/// Micro-detail: walking-scale relief below heightmap resolution
+/// (wavelengths ~50 km down to ~45 m). Retuned 2026-07-04 after live QA
+/// showed the spectrum-continuation amplitudes (A0≈0.0028) render as
+/// glass: slopes were 0.2-0.5% at every scale. Targets now: ~5% slope at
+/// 52 km, ~17% at 1 km, ~34% at 100 m before masking (elevation_fine
+/// masks plains down to 25% of this). Gain raised to 0.8 (vs. an initial
+/// 0.64 trial, which measured only ~0.007 RMS 1 km slope on seed 42 — well
+/// under the walking-scale-relief floor): slower per-octave falloff shifts
+/// more energy into the walking-scale band without increasing the total
+/// octave-sum enough to threaten the coarse/fine seam budget (measured
+/// worst-case seam ~0.11 of the 0.20 budget). Libm-free.
 pub fn micro(seed: u64, p: V3) -> f64 {
-    // 0.35 * 0.5^7 / 0.984375: detail's octave-6 amplitude one step past
-    // its last (its 6-octave amp sum is 0.984375; see raw_elevation).
-    const A0: f64 = 0.35 * 0.007_812_5 / 0.984_375;
-    const F0: f64 = 2.6 * 47.045_880_999_999_99;
+    const A0: f64 = 0.07;
+    const F0: f64 = 2.6 * 47.045_880_999_999_99; // 2.6 * 1.9^6 (unchanged)
     let mut sum = 0.0;
     let mut amp = A0;
     let mut freq = F0;
@@ -91,7 +94,7 @@ pub fn micro(seed: u64, p: V3) -> f64 {
                 seed ^ (0x4D49_4352 + k),
                 [p[0] * freq, p[1] * freq, p[2] * freq],
             );
-        amp *= 0.6;
+        amp *= 0.8;
         freq *= 1.9;
     }
     sum

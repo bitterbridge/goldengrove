@@ -205,20 +205,49 @@ fn micro_detail_is_small_and_continuous() {
         prev = Some(m);
     }
     assert!(
-        worst_val < 0.007,
+        worst_val < 0.20,
         "micro amplitude {worst_val} exceeds spectral budget"
     );
     assert!(
-        worst_jump < 0.002,
+        worst_jump < 0.03,
         "micro jump {worst_jump} over ~60 m step — discontinuous"
     );
-    assert!(worst_val > 1e-5, "micro is degenerate/zero");
+    assert!(
+        worst_val > 0.01,
+        "micro is degenerate — retune lost its amplitude"
+    );
+}
+
+#[test]
+fn fine_terrain_has_walking_scale_relief() {
+    // RMS slope sampled at ~1 km spacing must be mountain-legible. The
+    // pre-retune spectrum measured ~0.005 here; the retune targets ~0.05+
+    // globally (land masked higher, plains lower).
+    let desc = generate(42);
+    let anchor = desc.stars.len() + desc.anchor_planet;
+    let spec = TerrainSpec::for_body(42, &desc, anchor).unwrap();
+    let radius: f64 = 6.371e6; // sampling geometry only; slope is dimensionless
+    let step_deg = (1000.0 / radius).to_degrees();
+    let mut sq_sum = 0.0;
+    let n = 4000;
+    for i in 0..n {
+        let lat = -60.0 + 120.0 * (i as f64) / (n as f64);
+        let lon = -170.0 + 340.0 * (i as f64 * 0.618_033_988_75).fract();
+        let e0 = spec.elevation_fine(lat, lon);
+        let e1 = spec.elevation_fine(lat + step_deg, lon);
+        let slope = (e1 - e0) / 1000.0;
+        sq_sum += slope * slope;
+    }
+    let rms = (sq_sum / n as f64).sqrt();
+    assert!(rms > 0.02, "terrain is glassy: RMS 1km slope {rms}");
+    assert!(rms < 0.60, "terrain is spiky noise: RMS 1km slope {rms}");
 }
 
 #[test]
 fn elevation_fine_agrees_with_elevation_at_scale() {
-    // fine = relief_m * (elevation + micro): the base field is untouched, so
-    // fine/relief must stay within the micro budget of elevation() everywhere.
+    // fine = relief_m * (elevation + mask * micro): the base field is
+    // untouched, so fine/relief must stay within micro's masked octave sum
+    // (<= 0.194 relative units) of elevation() everywhere.
     let desc = generate(42);
     let anchor = desc.stars.len() + desc.anchor_planet;
     let spec = TerrainSpec::for_body(42, &desc, anchor).unwrap();
@@ -230,7 +259,7 @@ fn elevation_fine_agrees_with_elevation_at_scale() {
             let coarse = spec.elevation(lat, lon);
             let fine = spec.elevation_fine(lat, lon);
             let diff = (fine / relief - coarse).abs();
-            assert!(diff < 0.007, "spectral seam at ({lat},{lon}): {diff}");
+            assert!(diff < 0.20, "spectral seam at ({lat},{lon}): {diff}");
         }
     }
 }
