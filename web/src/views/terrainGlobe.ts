@@ -21,13 +21,14 @@ export interface TerrainGlobe {
   update(
     latDeg: number,
     lonDeg: number,
-    eyeAltM: number,
+    terrainM: number,
+    aboveTerrainM: number,
     suns: SunSpec[],
     buildBudget?: number,
     atmDensity?: number,
     dayFactor?: number,
   ): void;
-  stats(): { built: number; pendingBuilds: number };
+  stats(): { built: number; pendingBuilds: number; deepestBuilt: number };
   dispose(): void;
 }
 
@@ -134,7 +135,8 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
   function update(
     latDeg: number,
     lonDeg: number,
-    eyeAltM: number,
+    terrainM: number,
+    aboveTerrainM: number,
     suns: SunSpec[],
     buildBudget = 2,
     atmDensity = 0,
@@ -151,10 +153,21 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
       up[2] * east[0] - up[0] * east[2],
       up[0] * east[1] - up[1] * east[0],
     ];
+    // LOD split distances are measured against the UNDISPLACED sphere, so
+    // the camera point fed to the tree must rise only by height ABOVE THE
+    // LOCAL TERRAIN — including terrain elevation here would make the split
+    // test think the camera is that much farther from every tile center,
+    // stalling refinement early exactly underfoot (e.g. standing on a
+    // 2000 m peak would look like flying at 2 km to the LOD tree). True eye
+    // altitude (terrain + above-terrain) is reserved for things that need
+    // the real camera height: fog falloff and the RTC re-anchor position.
+    const eyeAltM = terrainM + aboveTerrainM;
+    const camRLod = radiusM + aboveTerrainM;
     const camR = radiusM + eyeAltM;
+    const camBfLod: [number, number, number] = [up[0] * camRLod, up[1] * camRLod, up[2] * camRLod];
     const camBf: [number, number, number] = [up[0] * camR, up[1] * camR, up[2] * camR];
 
-    const { render, build, evict } = tree.update(camBf);
+    const { render, build, evict } = tree.update(camBfLod);
 
     for (const key of evict) {
       const m = meshes.get(key);
@@ -242,5 +255,14 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number): TerrainGlobe | n
     waterMaterial.dispose();
   }
 
-  return { scene, update, stats: () => ({ built: meshes.size, pendingBuilds }), dispose };
+  function deepestBuilt(): number {
+    let deepest = -1;
+    for (const key of meshes.keys()) {
+      const level = Number(key.split(':')[1]);
+      if (level > deepest) deepest = level;
+    }
+    return deepest;
+  }
+
+  return { scene, update, stats: () => ({ built: meshes.size, pendingBuilds, deepestBuilt: deepestBuilt() }), dispose };
 }

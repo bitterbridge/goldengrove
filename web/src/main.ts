@@ -352,9 +352,13 @@ async function boot(): Promise<void> {
       }
       renderer.render(ground.scene, groundCamera);
       if (terrainGlobe) {
-        const eyeAlt = (currentElevationM ?? 0) + 1.7 + flightAltM;
+        // LOD refinement must use height above the LOCAL terrain, not above
+        // sea level — folding terrain elevation into the LOD altitude
+        // stalls refinement early exactly underfoot (see terrainGlobe.ts).
+        const terrainM = currentElevationM ?? 0;
+        const aboveTerrainM = 1.7 + flightAltM;
         const atmDensity = atmosphereDensityFor(sim.descriptor, layout[current.body]!);
-        terrainGlobe.update(current.lat ?? 0, current.lon ?? 0, eyeAlt, suns, 2, atmDensity, ground.dayFactor());
+        terrainGlobe.update(current.lat ?? 0, current.lon ?? 0, terrainM, aboveTerrainM, suns, 2, atmDensity, ground.dayFactor());
         renderer.clearDepth();
         renderer.render(terrainGlobe.scene, groundCamera);
       }
