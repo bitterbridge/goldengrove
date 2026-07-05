@@ -143,6 +143,11 @@ pub struct ClimateSpec {
     // width x height (128x64), row-major, pixel centers like
     // gg_terrain::TerrainSpec::heightmap (row 0 = lat +90, col 0 = lon -180).
     moisture_grid: Vec<f32>,
+    // Cached so `info()` (no terrain access) can report stats without
+    // recomputing elevation. Computed once, over the same 128x64 grid, at
+    // construction time while the terrain reference is in hand.
+    mean_temp_k: f64,
+    ice_fraction: f64,
 }
 
 impl ClimateSpec {
@@ -155,9 +160,12 @@ impl ClimateSpec {
     ) -> Option<ClimateSpec> {
         let facts = climate_facts(desc, body_index)?;
         let moisture_grid = build_moisture_grid(&facts, terrain);
+        let (mean_temp_k, ice_fraction) = climate_stats(&facts, &moisture_grid, terrain);
         Some(ClimateSpec {
             facts,
             moisture_grid,
+            mean_temp_k,
+            ice_fraction,
         })
     }
 
@@ -177,6 +185,196 @@ impl ClimateSpec {
             lon_deg,
         )
     }
+
+    /// Classifies a single point into one of the 13 biomes from its
+    /// lapse-adjusted temperature, moisture, and elevation.
+    pub fn biome(&self, terrain: &gg_terrain::TerrainSpec, lat_deg: f64, lon_deg: f64) -> Biome {
+        let e = terrain.elevation_fine(lat_deg, lon_deg);
+        let t = self.temperature_k(lat_deg, e);
+        let m = self.moisture(lat_deg, lon_deg);
+        classify(t, m, e, self.facts.atm_density(), self.facts.doomed())
+    }
+
+    /// Equirect biome classification grid: row-major, row 0 = lat +90,
+    /// col 0 = lon -180, pixel centers like `gg_terrain::TerrainSpec::heightmap`.
+    pub fn biome_grid(&self, terrain: &gg_terrain::TerrainSpec, w: usize, h: usize) -> Vec<u8> {
+        let mut out = Vec::with_capacity(w * h);
+        for row in 0..h {
+            let lat = 90.0 - (row as f64 + 0.5) * 180.0 / h as f64;
+            for col in 0..w {
+                let lon = -180.0 + (col as f64 + 0.5) * 360.0 / w as f64;
+                out.push(self.biome(terrain, lat, lon) as u8);
+            }
+        }
+        out
+    }
+
+    /// Summary climate stats, cached from construction (128x64 grid).
+    pub fn info(&self) -> ClimateInfo {
+        ClimateInfo {
+            mean_temp_k: self.mean_temp_k,
+            ice_fraction: self.ice_fraction,
+        }
+    }
+}
+
+/// Summary climate facts for a body: `mean_temp_k` and `ice_fraction` are
+/// both computed over the same 128x64 biome grid built at construction.
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+pub struct ClimateInfo {
+    pub mean_temp_k: f64,
+    pub ice_fraction: f64,
+}
+
+/// The 13 biome classes. ORDER IS A GOLDEN DETERMINISM SURFACE: this is the
+/// canonical discriminant->u8 mapping serialized into biome grids and
+/// hashed by `biome_hash`. Never reorder or renumber; only append.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Biome {
+    DeepOcean = 0,
+    Shelf = 1,
+    Shore = 2,
+    IceCap = 3,
+    Tundra = 4,
+    BorealForest = 5,
+    TemperateForest = 6,
+    Grassland = 7,
+    Savanna = 8,
+    TropicalRainforest = 9,
+    HotDesert = 10,
+    ColdDesert = 11,
+    AlpineRock = 12,
+}
+
+fn is_vegetative(b: Biome) -> bool {
+    matches!(
+        b,
+        Biome::BorealForest
+            | Biome::TemperateForest
+            | Biome::Grassland
+            | Biome::Savanna
+            | Biome::TropicalRainforest
+    )
+}
+
+/// Pure classification table: elevation bands (ocean/shelf/shore) take
+/// priority, then temperature/moisture bands, then two post-rules applied
+/// in order: airless worlds lose all vegetation, doomed worlds get an
+/// arid one-step bias. See the plan for the pinned thresholds.
+fn classify(t_k: f64, m: f64, e_m: f64, atm_density: f64, doomed: bool) -> Biome {
+    let mut biome = if e_m < -400.0 {
+        Biome::DeepOcean
+    } else if e_m < 0.0 {
+        Biome::Shelf
+    } else if e_m < 15.0 {
+        Biome::Shore
+    } else if t_k < 250.0 {
+        Biome::IceCap
+    } else if t_k < 265.0 {
+        if e_m > 2500.0 {
+            Biome::AlpineRock
+        } else {
+            Biome::Tundra
+        }
+    } else if t_k < 280.0 {
+        if m >= 0.45 {
+            Biome::BorealForest
+        } else if m >= 0.25 {
+            Biome::Grassland
+        } else {
+            Biome::ColdDesert
+        }
+    } else if t_k < 293.0 {
+        if m >= 0.55 {
+            Biome::TemperateForest
+        } else if m >= 0.30 {
+            Biome::Grassland
+        } else if t_k < 286.0 {
+            Biome::ColdDesert
+        } else {
+            Biome::HotDesert
+        }
+    } else if m >= 0.60 {
+        Biome::TropicalRainforest
+    } else if m >= 0.35 {
+        Biome::Savanna
+    } else {
+        Biome::HotDesert
+    };
+
+    // Post-rule 1: airless worlds cannot support vegetation.
+    if atm_density < 1.0 && is_vegetative(biome) {
+        biome = if t_k < 286.0 {
+            Biome::ColdDesert
+        } else {
+            Biome::HotDesert
+        };
+    }
+
+    // Post-rule 2: doomed worlds are biased one step toward arid/barren.
+    if doomed {
+        biome = match biome {
+            Biome::TropicalRainforest => Biome::Savanna,
+            Biome::Savanna => Biome::HotDesert,
+            Biome::TemperateForest => Biome::Grassland,
+            Biome::BorealForest => Biome::Grassland,
+            Biome::Grassland => Biome::ColdDesert,
+            other => other,
+        };
+    }
+
+    biome
+}
+
+/// Diagnostic probe: the raw classification table as a pure function of
+/// scalars, bypassing temperature/moisture/elevation lookups. Lets tests
+/// pin exact threshold behavior and build Living-state twins of a Doomed
+/// body's grid. Mirrors `gg_terrain::__raw_probe`.
+#[doc(hidden)]
+pub fn __classify_raw(t_k: f64, m: f64, e_m: f64, atm_density: f64, doomed: bool) -> Biome {
+    classify(t_k, m, e_m, atm_density, doomed)
+}
+
+/// Computes the 128x64 biome grid once (over the same equirect convention
+/// as `biome_grid`) to derive `info()`'s cached stats: the cell-count mean
+/// temperature and the IceCap fraction.
+fn climate_stats(
+    facts: &ClimateFacts,
+    moisture_grid: &[f32],
+    terrain: &gg_terrain::TerrainSpec,
+) -> (f64, f64) {
+    let (w, h) = (MOISTURE_GRID_W, MOISTURE_GRID_H);
+    let mut temp_sum = 0.0;
+    let mut ice_cells = 0usize;
+    for row in 0..h {
+        let lat = 90.0 - (row as f64 + 0.5) * 180.0 / h as f64;
+        for col in 0..w {
+            let lon = -180.0 + (col as f64 + 0.5) * 360.0 / w as f64;
+            let e = terrain.elevation_fine(lat, lon);
+            let t = temperature_k(facts, lat, e);
+            let m = f64::from(moisture_grid[row * w + col]);
+            let biome = classify(t, m, e, facts.atm_density(), facts.doomed());
+            temp_sum += t;
+            if biome == Biome::IceCap {
+                ice_cells += 1;
+            }
+        }
+    }
+    let n = (w * h) as f64;
+    (temp_sum / n, ice_cells as f64 / n)
+}
+
+/// FNV-1a-64 over the raw grid bytes — the biome determinism fingerprint.
+/// Mirrors `gg_terrain::heightmap_hash`'s FNV constants; no quantization
+/// needed since the grid is already discrete `u8` class indices.
+pub fn biome_hash(grid: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for &b in grid {
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
 }
 
 fn hadley_m_lat(lat_deg: f64, tilt_rad: f64) -> f64 {
