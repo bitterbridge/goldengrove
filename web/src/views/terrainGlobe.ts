@@ -51,30 +51,46 @@ const MORPH_PROGRAM_CACHE_KEY = 'gg-morph';
  * from tile-CENTER distance leaves a fine tile's far edge under-morphed for
  * its actual distance, missing the coarse neighbor's surface — visible as
  * cross-level crack seams. Classic CDLOD morphs each vertex by its own
- * view-space distance instead.
+ * distance-from-LOD-point instead.
  *
  * uSplitDist is static per tile (SPLIT_K * tileEdgeLenM(tile.level)), set
  * once at build — the vertex shader recomputes the morph factor every frame
- * from the vertex's own view-space distance, not a CPU-computed per-tile
- * scalar. This closes seams: same-level neighbors share edge vertices, so
- * they share position, aParentPos AND uSplitDist, giving identical morph at
- * the shared edge (no crack). A fine tile adjacent to a coarser sibling is
- * always at distance >= its own uSplitDist (otherwise the tree would have
- * split it further), so ggMorph saturates to 1 there and its edge collapses
- * exactly onto the parent lattice.
+ * from the vertex's own distance to uLodCamLocal, not a CPU-computed
+ * per-tile scalar. This closes same-level seams: neighbors share edge
+ * vertices, so they share position, aParentPos AND uSplitDist, giving
+ * identical morph at the shared edge (no crack).
  *
- * View-space vertex distance (the render eye) is used as a stand-in for the
- * tree's LOD-camera distance to the tile center; they differ by at most the
- * (small, scaled) terrain height, well inside the 0.70-0.95 smoothstep
- * slack, so the substitution doesn't reintroduce popping. */
-function injectMorphShader(shader: THREE.WebGLProgramParametersWithUniforms, uSplitDist: { value: number }): void {
+ * INVARIANT: morph distance must be measured from the SAME point the tree
+ * splits on (tree.update's cameraBf, aka the LOD camera point — radiusM +
+ * aboveTerrainM, deliberately excluding terrain elevation; see update()),
+ * or the "fully-morphed-at-boundary" guarantee breaks. A fine tile adjacent
+ * to a coarser sibling is only guaranteed to sit at distance >= its own
+ * uSplitDist from the LOD point (that's the tree's own split test) — NOT
+ * from the render eye. Previously this shader measured distance from the
+ * render eye (modelViewMatrix), which diverges from the LOD point by
+ * roughly scaledTerrain + eye height; at 3x relief + altitude that's ~10 km
+ * on tall terrain, easily larger than the 0.70-0.95 smoothstep slack, so
+ * near tiles could sit UNDER their own uSplitDist in render-eye distance
+ * while the tree (correctly) judged them far enough to leave coarse —
+ * leaving ggMorph short of 1 at the boundary and reopening thin T-junction
+ * cracks. Measuring from uLodCamLocal (the LOD point, in tile-local/RTC
+ * coordinates for f32 precision) makes the shader's morph distance
+ * IDENTICAL to the tree's split metric, closing the seam exactly. */
+function injectMorphShader(
+  shader: THREE.WebGLProgramParametersWithUniforms,
+  uSplitDist: { value: number },
+  uLodCamLocal: { value: THREE.Vector3 },
+): void {
   shader.uniforms.uSplitDist = uSplitDist;
+  shader.uniforms.uLodCamLocal = uLodCamLocal;
   shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', '#include <common>\nattribute vec3 aParentPos;\nuniform float uSplitDist;')
+    .replace(
+      '#include <common>',
+      '#include <common>\nattribute vec3 aParentPos;\nuniform float uSplitDist;\nuniform vec3 uLodCamLocal;',
+    )
     .replace(
       '#include <begin_vertex>',
-      'vec4 ggMv = modelViewMatrix * vec4( position, 1.0 );\n' +
-        'float ggMorph = smoothstep( 0.7 * uSplitDist, 0.95 * uSplitDist, length( ggMv.xyz ) );\n' +
+      'float ggMorph = smoothstep( 0.7 * uSplitDist, 0.95 * uSplitDist, distance( position, uLodCamLocal ) );\n' +
         'vec3 transformed = mix( vec3( position ), aParentPos, ggMorph );',
     );
 }
@@ -153,11 +169,13 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number, reliefScale = 3):
     const tileMat = material.clone();
     tileMat.customProgramCacheKey = () => MORPH_PROGRAM_CACHE_KEY;
     const uSplitDist = { value: SPLIT_K * tileEdgeLenM(t.level, radiusM) };
-    tileMat.onBeforeCompile = (shader) => injectMorphShader(shader, uSplitDist);
+    const uLodCamLocal = { value: new THREE.Vector3() };
+    tileMat.onBeforeCompile = (shader) => injectMorphShader(shader, uSplitDist, uLodCamLocal);
 
     const mesh = new THREE.Mesh(geo, tileMat);
     mesh.userData.originBf = data.originBf;
     mesh.userData.uSplitDist = uSplitDist;
+    mesh.userData.uLodCamLocal = uLodCamLocal;
     mesh.userData.level = t.level; // test introspection only; not read by render code
     mesh.visible = false;
     mesh.frustumCulled = false; // tiles are selected CPU-side; sphere-scale bounds confuse three's culler
@@ -258,6 +276,13 @@ export function buildTerrainGlobe(sim: Sim, bodyIndex: number, reliefScale = 3):
       mesh.position.set(o[0] - camBf[0], o[1] - camBf[1], o[2] - camBf[2]);
       mesh.quaternion.copy(q);
       mesh.position.applyQuaternion(q);
+      // Drive the morph shader's distance origin from the exact same point
+      // tree.update() split on (camBfLod), expressed tile-local (f64
+      // subtraction against this tile's own origin, same RTC pattern as the
+      // mesh position above) so the f32 uniform stays precise. See the
+      // invariant comment on injectMorphShader.
+      const uLodCamLocal = mesh.userData.uLodCamLocal as { value: THREE.Vector3 } | undefined;
+      uLodCamLocal?.value.set(camBfLod[0] - o[0], camBfLod[1] - o[1], camBfLod[2] - o[2]);
 
       const wm = waterMeshes.get(key);
       if (wm) {

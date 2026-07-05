@@ -267,6 +267,37 @@ describe('buildTerrainGlobe', () => {
     expect(foundAdjacentPair).toBe(true);
   });
 
+  it('drives uLodCamLocal from the same LOD point the tree splits on (finite, plausible, actually updated)', () => {
+    const g = buildTerrainGlobe(fakeSim(), anchorBody)!;
+    for (let f = 0; f < 40; f++) g.update(15, 30, 252, 2, suns, 8);
+
+    const before = new Map<THREE.Mesh, THREE.Vector3>();
+    g.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || !m.visible || (m.material as THREE.Material).transparent) return;
+      const uLodCamLocal = m.userData.uLodCamLocal as { value: THREE.Vector3 } | undefined;
+      expect(uLodCamLocal).toBeTruthy();
+      expect(uLodCamLocal!.value.isVector3).toBe(true);
+      const len = uLodCamLocal!.value.length();
+      expect(Number.isFinite(len)).toBe(true);
+      expect(len).toBeGreaterThan(0);
+      before.set(m, uLodCamLocal!.value.clone());
+    });
+    expect(before.size).toBeGreaterThan(3);
+
+    // moving the observer must actually re-drive the uniform (it's not a
+    // stale value set once at build)
+    for (let f = 0; f < 40; f++) g.update(20, 35, 252, 2, suns, 8);
+    let changed = 0;
+    g.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || !m.visible || !before.has(m)) return;
+      const uLodCamLocal = m.userData.uLodCamLocal as { value: THREE.Vector3 };
+      if (!uLodCamLocal.value.equals(before.get(m)!)) changed++;
+    });
+    expect(changed).toBeGreaterThan(0);
+  });
+
   it('reliefScale=3 raises the rendered surface but not water', () => {
     const ref = bodyLayout(golden)[anchorBody]!;
     const R = ref.kind === 'star' ? 0 : bodyRadiusM(golden, ref);
