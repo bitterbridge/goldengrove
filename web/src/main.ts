@@ -85,9 +85,15 @@ async function boot(): Promise<void> {
   // lifecycle and rebuilds it whenever the standing body changes.
   let terrainGlobe: TerrainGlobe | null = null;
   let standingOcean = false;
+  // Vertical exaggeration applied to the terrain globe and the observer's eye
+  // height in ground view: 3× makes relief legible at a glance; the ground
+  // view's true-scale button toggles this down to 1 (true relief). Fully
+  // independent of the orrery's `trueScale` flag below — they share a button
+  // but never a state variable.
+  let reliefScale = 3;
   function setStandingGlobe(body: number | null): void {
     terrainGlobe?.dispose();
-    terrainGlobe = body !== null ? buildTerrainGlobe(sim, body) : null;
+    terrainGlobe = body !== null ? buildTerrainGlobe(sim, body, reliefScale) : null;
     standingOcean = body !== null && (sim.bodyTerrainInfo(body)?.ocean_fraction ?? 0) > 0;
     ground.setDiscVisible(terrainGlobe === null);
   }
@@ -128,7 +134,15 @@ async function boot(): Promise<void> {
   const hud = buildHud(app, current.seed, {
     onPlayPause: () => { clock.paused = !clock.paused; hud.setPaused(clock.paused); },
     onSpeed: (m) => { clock.speed = m; },
-    onTrueScale: (on) => { trueScale = on; },
+    onTrueScale: (on) => {
+      if (current.view === 'ground') {
+        reliefScale = reliefScale === 3 ? 1 : 3;
+        setStandingGlobe(current.body);
+        hud.setTrueScaleLabel(reliefScale === 3 ? '⛰ ×3 relief' : '⛰ true relief');
+      } else {
+        trueScale = on;
+      }
+    },
     onReroll: () => { location.hash = `seed=${randomSeed()}`; },
     onShare: () => {
       syncUrl();
@@ -212,6 +226,7 @@ async function boot(): Promise<void> {
     if (clock.speed > 3600) { clock.speed = 3600; hud.setActiveSpeed(3600); }
     hud.setMaxSpeed(3600);
     setStandingGlobe(body);
+    hud.setTrueScaleLabel(reliefScale === 3 ? '⛰ ×3 relief' : '⛰ true relief');
     refreshElevation();
     syncUrl();
   }
@@ -222,6 +237,7 @@ async function boot(): Promise<void> {
     flightAltM = 0;
     refreshViewButton();
     hud.setMaxSpeed(null);
+    hud.setTrueScaleLabel('true scale');
     setStandingGlobe(null);
     syncUrl();
   }
@@ -395,10 +411,15 @@ async function boot(): Promise<void> {
       // in the observer's ENU frame. Same depth buffer as the terrain pass
       // below — no second clear — so terrain occludes bodies below the
       // horizon and bodies occlude each other correctly.
-      const terrainM = eyeTerrainM(currentElevationM ?? 0, standingOcean);
+      // Render-only: exaggerate the eye's terrain-following height by the
+      // same reliefScale as the terrain globe's geometry, so the camera sits
+      // on the exaggerated surface instead of floating above/sinking below
+      // it. currentElevationM itself (HUD, flightStep, decoupling, URL)
+      // stays true-scale — only this derived value is scaled.
+      const terrainRenderM = eyeTerrainM(currentElevationM ?? 0, standingOcean) * reliefScale;
       const aboveTerrainM = 1.7 + flightAltM;
       const frame = observerFrame(states, sim.descriptor, current.body, current.lat ?? 0, current.lon ?? 0);
-      const eyeAboveCenterM = terrainM + aboveTerrainM;
+      const eyeAboveCenterM = terrainRenderM + aboveTerrainM;
       const obsWorld: Vec3 = [
         frame.positionM[0] + frame.up[0] * eyeAboveCenterM,
         frame.positionM[1] + frame.up[1] * eyeAboveCenterM,
@@ -412,7 +433,7 @@ async function boot(): Promise<void> {
         // sea level — folding terrain elevation into the LOD altitude
         // stalls refinement early exactly underfoot (see terrainGlobe.ts).
         const atmDensity = atmosphereDensityFor(sim.descriptor, layout[current.body]!);
-        terrainGlobe.update(current.lat ?? 0, current.lon ?? 0, terrainM, aboveTerrainM, suns, 2, atmDensity, ground.dayFactor());
+        terrainGlobe.update(current.lat ?? 0, current.lon ?? 0, terrainRenderM, aboveTerrainM, suns, 2, atmDensity, ground.dayFactor());
         renderer.render(terrainGlobe.scene, groundCamera);
       }
       labelRenderer.render(localSpace, groundCamera);

@@ -65,6 +65,14 @@ describe('buildHud interactions', () => {
     expect(speedButtons.every((b) => !b.disabled)).toBe(true);
   });
 
+  it('setTrueScaleLabel relabels the true-scale button', () => {
+    const root = document.createElement('div');
+    const hud = buildHud(root, '42', noop);
+    const btn = [...root.querySelectorAll('button')].find((b) => b.textContent === 'true scale')!;
+    hud.setTrueScaleLabel('⛰ ×3 relief');
+    expect(btn.textContent).toBe('⛰ ×3 relief');
+  });
+
   it('view-toggle button is controllable', () => {
     const root = document.createElement('div');
     let toggles = 0;

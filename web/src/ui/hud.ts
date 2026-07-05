@@ -35,6 +35,7 @@ export interface Hud {
   setActiveSpeed(mult: number): void;
   setViewButton(label: string, visible: boolean): void;
   setMaxSpeed(maxMult: number | null): void;
+  setTrueScaleLabel(label: string): void;
 }
 
 export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud {
@@ -114,6 +115,7 @@ export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud
         b.disabled = maxMult !== null && SPEED_STEPS[i]!.mult > maxMult;
       });
     },
+    setTrueScaleLabel: (label) => { trueScale.textContent = label; },
   };
   hud.setActiveSpeed(1);
   return hud;
