@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hypsometricColor, slopeShade } from './terrainTexture';
+import { biomeTexture, hypsometricColor, slopeShade } from './terrainTexture';
 
 const tint: [number, number, number] = [155, 143, 122]; // Rocky palette 0x9b8f7a
 
@@ -47,5 +47,22 @@ describe('slopeShade', () => {
     const s = slopeShade(cliff, w, h, 2, 3);
     expect(s).toBeGreaterThanOrEqual(0.75);
     expect(s).toBeLessThanOrEqual(1.15);
+  });
+});
+
+describe('biomeTexture', () => {
+  it('returns null without a canvas (jsdom has no 2d context)', () => {
+    const w = 8, h = 4;
+    const biomes = new Uint8Array(w * h);
+    const elevations = new Float32Array(w * h);
+    expect(biomeTexture(biomes, elevations, w, h)).toBeNull();
+  });
+
+  it('returns null (not throws) with out-of-range class indices', () => {
+    const w = 8, h = 4;
+    const biomes = new Uint8Array(w * h).fill(255); // out-of-range -> clamps to AlpineRock
+    const elevations = new Float32Array(w * h);
+    expect(() => biomeTexture(biomes, elevations, w, h)).not.toThrow();
+    expect(biomeTexture(biomes, elevations, w, h)).toBeNull();
   });
 });

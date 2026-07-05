@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { biomeColor } from './biomePalette';
 
 /** Hypsometric tint ramp. Elevations are relative (sea level = 0). */
 const OCEAN_DEEP: [number, number, number] = [8, 26, 58];
@@ -67,6 +68,40 @@ export function terrainTexture(
         const e = map[row * w + col]!;
         const [r, g, b] = hypsometricColor(e, slopeShade(map, w, h, row, col), tint, dead);
         const o = (row * w + col) * 4;
+        img.data[o] = r;
+        img.data[o + 1] = g;
+        img.data[o + 2] = b;
+        img.data[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  } catch {
+    return null;
+  }
+}
+
+/** Biome-colored orrery texture from the shared palette; mirrors `terrainTexture`'s shape. */
+export function biomeTexture(
+  biomes: Uint8Array,
+  elevations: Float32Array,
+  w: number,
+  h: number,
+): THREE.CanvasTexture | null {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const img = ctx.createImageData(w, h);
+    for (let row = 0; row < h; row++) {
+      for (let col = 0; col < w; col++) {
+        const i = row * w + col;
+        const [r, g, b] = biomeColor(biomes[i]!, slopeShade(elevations, w, h, row, col));
+        const o = i * 4;
         img.data[o] = r;
         img.data[o + 1] = g;
         img.data[o + 2] = b;

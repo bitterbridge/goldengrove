@@ -62,4 +62,14 @@ describe('getTerrainTexture cache', () => {
     expect(a.calls()).toBeGreaterThan(0);
     expect(b.calls()).toBeGreaterThan(0); // b was NOT served from a's entry
   });
+
+  it('takes the biome path without crashing when the biome grid is non-empty', () => {
+    const { sim } = countingSim('cache-test-4');
+    sim.bodyHeightmap = () => new Float32Array(512 * 256);
+    sim.bodyBiomeGrid = () => new Uint8Array(512 * 256);
+    expect(() => getTerrainTexture(sim, 3)).not.toThrow();
+    // happy-dom has no real 2d canvas context, so biomeTexture falls back to
+    // null here too — same shape as the hypsometric path, cache falls through.
+    expect(getTerrainTexture(sim, 3)).toBeNull();
+  });
 });
