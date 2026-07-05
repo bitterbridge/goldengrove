@@ -78,6 +78,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "gg-climate"
+version = "0.1.0"
+dependencies = [
+ "gg-core",
+ "gg-gen",
+ "serde",
+]
+
+[[package]]
 name = "gg-core"
 version = "0.1.0"
 dependencies = [

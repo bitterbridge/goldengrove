@@ -1,0 +1,9 @@
+[package]
+name = "gg-climate"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gg-core = { path = "../gg-core" }
+gg-gen = { path = "../gg-gen" }
+serde = { version = "1", features = ["derive"] }
