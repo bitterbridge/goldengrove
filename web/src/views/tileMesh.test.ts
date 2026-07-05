@@ -151,10 +151,15 @@ describe('buildTileMesh', () => {
     for (let k = 0; k < 3; k++) {
       expect(m.parentPositions[3 * i + k]).toBeCloseTo((at(2 * n + 4, k) + at(2 * n + 6, k)) / 2, 1);
     }
-    // odd row, odd col: diagonal midpoint
+    // odd row, odd col: diagonal midpoint. Must be the ANTI-diagonal
+    // ((row-1, col+1) and (row+1, col-1)) — grid quads triangulate as
+    // [i0,i1,i2]+[i1,i3,i2], which share the edge (row,col+1)-(row+1,col),
+    // i.e. the anti-diagonal. Using the main diagonal here would put the
+    // morph target off the parent's actual triangle surface whenever that
+    // parent quad is non-planar.
     i = 3 * n + 5;
     for (let k = 0; k < 3; k++) {
-      expect(m.parentPositions[3 * i + k]).toBeCloseTo((at(2 * n + 4, k) + at(4 * n + 6, k)) / 2, 1);
+      expect(m.parentPositions[3 * i + k]).toBeCloseTo((at(2 * n + 6, k) + at(4 * n + 4, k)) / 2, 1);
     }
   });
 

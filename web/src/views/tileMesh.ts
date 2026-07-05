@@ -106,7 +106,11 @@ export function buildTileMesh(t: TileId, elevationsM: Float32Array, inputs: Tile
       } else if (!rowEven && colEven) {
         midPos(i, (row - 1) * n + col, (row + 1) * n + col);
       } else {
-        midPos(i, (row - 1) * n + (col - 1), (row + 1) * n + (col + 1));
+        // Anti-diagonal, matching the grid quad triangulation below
+        // ([i0,i1,i2] + [i1,i3,i2] share edge (row,col+1)-(row+1,col)) —
+        // NOT the main diagonal, or the morph target would land off the
+        // parent's actual triangle surface on non-planar quads.
+        midPos(i, (row - 1) * n + (col + 1), (row + 1) * n + (col - 1));
       }
     }
   }

@@ -424,7 +424,12 @@ async function boot(): Promise<void> {
       // on the exaggerated surface instead of floating above/sinking below
       // it. currentElevationM itself (HUD, flightStep, decoupling, URL)
       // stays true-scale — only this derived value is scaled.
-      const terrainRenderM = eyeTerrainM(currentElevationM ?? 0, standingOcean) * reliefScale;
+      // Ordering invariant: scale BEFORE floor. The wading floor is a
+      // render-space constant (water always renders at true, unscaled
+      // radius R), so it must clamp the already-scaled terrain value —
+      // flooring first and then scaling would push the eye back under the
+      // unscaled water surface at reliefScale > 1.
+      const terrainRenderM = eyeTerrainM((currentElevationM ?? 0) * reliefScale, standingOcean);
       const aboveTerrainM = 1.7 + flightAltM;
       const frame = observerFrame(states, sim.descriptor, current.body, current.lat ?? 0, current.lon ?? 0);
       const eyeAboveCenterM = terrainRenderM + aboveTerrainM;

@@ -127,4 +127,11 @@ describe('eyeTerrainM', () => {
   it('follows terrain everywhere on dry worlds', () => {
     expect(eyeTerrainM(-95, false)).toBe(-95);
   });
+  it('floors AFTER relief scaling, since water renders unscaled: scale before floor', () => {
+    // Caller composition must be eyeTerrainM(terrainM * reliefScale, ocean),
+    // never eyeTerrainM(terrainM, ocean) * reliefScale. The floor is a
+    // render-space constant (water always renders at true scale), so it has
+    // to apply to the already-scaled terrain value, not be scaled itself.
+    expect(eyeTerrainM(-95 * 3, true)).toBeCloseTo(-0.7, 9); // eye = -0.7 + 1.7 = +1.0 m above sea
+  });
 });
