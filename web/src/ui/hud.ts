@@ -21,7 +21,7 @@ export const SPEED_STEPS: Array<{ label: string; mult: number }> = [
 export interface HudCallbacks {
   onPlayPause(): void;
   onSpeed(mult: number): void;
-  onTrueScale(on: boolean): void;
+  onTrueScale(): void;
   onReroll(): void;
   onShare(): void;
   onDateJump(year: number, dayOfYear: number): void;
@@ -36,6 +36,7 @@ export interface Hud {
   setViewButton(label: string, visible: boolean): void;
   setMaxSpeed(maxMult: number | null): void;
   setTrueScaleLabel(label: string): void;
+  setTrueScaleActive(on: boolean): void;
 }
 
 export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud {
@@ -44,12 +45,13 @@ export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud
   const reroll = el('button', '', '⟲ reroll');
   reroll.addEventListener('click', () => cb.onReroll());
   const trueScale = el('button', '', 'true scale');
-  let ts = false;
-  trueScale.addEventListener('click', () => {
-    ts = !ts;
-    trueScale.classList.toggle('active', ts);
-    cb.onTrueScale(ts);
-  });
+  // Stateless about which mode it serves (orrery trueScale vs. ground
+  // reliefScale) — the click just reports "toggle happened"; the caller
+  // decides what that means and drives activeness back via
+  // setTrueScaleActive(). Never flip the active class here: with two
+  // independent semantic toggles sharing this one button, an internal flip
+  // desyncs from whichever toggle isn't currently in view.
+  trueScale.addEventListener('click', () => cb.onTrueScale());
   const share = el('button', '', 'share');
   share.addEventListener('click', () => cb.onShare());
   topLeft.append(reroll, trueScale, share);
@@ -116,6 +118,7 @@ export function buildHud(root: HTMLElement, seed: string, cb: HudCallbacks): Hud
       });
     },
     setTrueScaleLabel: (label) => { trueScale.textContent = label; },
+    setTrueScaleActive: (on) => { trueScale.classList.toggle('active', on); },
   };
   hud.setActiveSpeed(1);
   return hud;

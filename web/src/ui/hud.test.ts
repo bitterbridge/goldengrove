@@ -19,7 +19,7 @@ describe('formatDate', () => {
 });
 
 describe('buildHud interactions', () => {
-  const noop = { onPlayPause() {}, onSpeed(_: number) {}, onTrueScale(_: boolean) {}, onReroll() {}, onShare() {}, onDateJump(_: number, __: number) {}, onToggleView() {} };
+  const noop = { onPlayPause() {}, onSpeed(_: number) {}, onTrueScale() {}, onReroll() {}, onShare() {}, onDateJump(_: number, __: number) {}, onToggleView() {} };
 
   it('share button fires onShare and flashes', () => {
     const root = document.createElement('div');
@@ -71,6 +71,32 @@ describe('buildHud interactions', () => {
     const btn = [...root.querySelectorAll('button')].find((b) => b.textContent === 'true scale')!;
     hud.setTrueScaleLabel('⛰ ×3 relief');
     expect(btn.textContent).toBe('⛰ ×3 relief');
+  });
+
+  it('true-scale button click fires onTrueScale without flipping its own active class', () => {
+    const root = document.createElement('div');
+    let calls = 0;
+    const hud = buildHud(root, '42', { ...noop, onTrueScale: () => { calls++; } });
+    const btn = [...root.querySelectorAll('button')].find((b) => b.textContent === 'true scale')!;
+    btn.click();
+    expect(calls).toBe(1);
+    expect(btn.classList.contains('active')).toBe(false); // hud is stateless — the caller owns activeness
+    btn.click();
+    expect(calls).toBe(2);
+    expect(btn.classList.contains('active')).toBe(false); // still not flipped after a second click
+  });
+
+  it('setTrueScaleActive sets and clears the active class independent of clicks', () => {
+    const root = document.createElement('div');
+    const hud = buildHud(root, '42', noop);
+    const btn = [...root.querySelectorAll('button')].find((b) => b.textContent === 'true scale')!;
+    hud.setTrueScaleActive(true);
+    expect(btn.classList.contains('active')).toBe(true);
+    hud.setTrueScaleActive(false);
+    expect(btn.classList.contains('active')).toBe(false);
+    // clicking never toggles it on its own — only the explicit setter does
+    btn.click();
+    expect(btn.classList.contains('active')).toBe(false);
   });
 
   it('view-toggle button is controllable', () => {

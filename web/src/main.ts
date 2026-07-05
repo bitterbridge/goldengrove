@@ -134,13 +134,19 @@ async function boot(): Promise<void> {
   const hud = buildHud(app, current.seed, {
     onPlayPause: () => { clock.paused = !clock.paused; hud.setPaused(clock.paused); },
     onSpeed: (m) => { clock.speed = m; },
-    onTrueScale: (on) => {
+    onTrueScale: () => {
+      // hud's button is stateless — it just reports a click. main owns which
+      // of the two independent toggles (orrery trueScale vs. ground
+      // reliefScale) that click means, and drives the button's active class
+      // back explicitly so it can never desync from either.
       if (current.view === 'ground') {
         reliefScale = reliefScale === 3 ? 1 : 3;
         setStandingGlobe(current.body);
         hud.setTrueScaleLabel(reliefScale === 3 ? '⛰ ×3 relief' : '⛰ true relief');
+        hud.setTrueScaleActive(reliefScale !== 1);
       } else {
-        trueScale = on;
+        trueScale = !trueScale;
+        hud.setTrueScaleActive(trueScale);
       }
     },
     onReroll: () => { location.hash = `seed=${randomSeed()}`; },
@@ -227,6 +233,7 @@ async function boot(): Promise<void> {
     hud.setMaxSpeed(3600);
     setStandingGlobe(body);
     hud.setTrueScaleLabel(reliefScale === 3 ? '⛰ ×3 relief' : '⛰ true relief');
+    hud.setTrueScaleActive(reliefScale !== 1);
     refreshElevation();
     syncUrl();
   }
@@ -238,6 +245,7 @@ async function boot(): Promise<void> {
     refreshViewButton();
     hud.setMaxSpeed(null);
     hud.setTrueScaleLabel('true scale');
+    hud.setTrueScaleActive(trueScale);
     setStandingGlobe(null);
     syncUrl();
   }
