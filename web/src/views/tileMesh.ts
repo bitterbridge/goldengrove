@@ -114,14 +114,19 @@ export function buildTileMesh(t: TileId, elevationsM: Float32Array, inputs: Tile
       }
     }
   }
-  // Skirt vertices copy their SOURCE grid vertex's parent position (not
-  // their own dropped position) — the morph target must stay on the
-  // undropped grid surface, or geomorphing would re-raise the skirt.
+  // Skirt morph targets: the source vertex's parent position pulled DOWN by
+  // the same radial skirt depth. Copying the surface parent position alone
+  // collapses skirts to zero depth at full morph — exactly where coarse and
+  // fine edges meet — and T-junction pinprick holes open up (live-QA
+  // confirmed as black dashes along tile borders).
   ring.forEach((gi, s) => {
     const dst = gridCount + s;
-    parentPositions[3 * dst] = parentPositions[3 * gi]!;
-    parentPositions[3 * dst + 1] = parentPositions[3 * gi + 1]!;
-    parentPositions[3 * dst + 2] = parentPositions[3 * gi + 2]!;
+    const ux = grid.units[3 * gi]!;
+    const uy = grid.units[3 * gi + 1]!;
+    const uz = grid.units[3 * gi + 2]!;
+    parentPositions[3 * dst] = parentPositions[3 * gi]! - ux * skirtDepth;
+    parentPositions[3 * dst + 1] = parentPositions[3 * gi + 1]! - uy * skirtDepth;
+    parentPositions[3 * dst + 2] = parentPositions[3 * gi + 2]! - uz * skirtDepth;
   });
 
   // Indices: N² grid quads + one quad per skirt edge segment (4*TILE_QUADS

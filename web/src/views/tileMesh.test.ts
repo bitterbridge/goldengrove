@@ -163,11 +163,20 @@ describe('buildTileMesh', () => {
     }
   });
 
-  it('skirt vertices copy their source parent position', () => {
+  it('skirt morph targets keep the skirt depth (no zero-depth skirts at full morph)', () => {
+    // If a skirt vertex's aParentPos sat ON the surface, a fully morphed
+    // tile would have zero-depth skirts exactly where coarse/fine edges
+    // meet — T-junction pinprick holes (live-QA confirmed). The morph
+    // target must be the source's parent position pulled down by the same
+    // radial skirt depth.
     const e = new Float32Array(gridCount).fill(500);
     const m = buildTileMesh(t, e, { ...inputs, verticalScale: 1 });
+    const depth = 0.08 * tileEdgeLenM(t.level, R);
+    const o = m.originBf;
+    const radiusOf = (arr: Float32Array, i: number) =>
+      Math.hypot(o[0] + arr[3 * i]!, o[1] + arr[3 * i + 1]!, o[2] + arr[3 * i + 2]!);
     // first skirt vertex sources grid vertex 0 (ring starts at row 0, col 0)
     const s = gridCount;
-    expect(m.parentPositions[3 * s]).toBe(m.parentPositions[0]);
+    expect(radiusOf(m.parentPositions, s)).toBeCloseTo(radiusOf(m.parentPositions, 0) - depth, 2);
   });
 });
