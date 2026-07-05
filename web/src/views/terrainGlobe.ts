@@ -90,7 +90,16 @@ function injectMorphShader(
     )
     .replace(
       '#include <begin_vertex>',
-      'float ggMorph = smoothstep( 0.7 * uSplitDist, 0.95 * uSplitDist, distance( position, uLodCamLocal ) );\n' +
+      // Band placement is load-bearing: a level-L tile EXISTS for distances
+      // in [splitDist, 2·splitDist) (it splits below, merges above). Border
+      // vertices shared with a coarser neighbor sit at >= ~1.18·splitDist of
+      // the FINE side and <= 1.0·splitDist of the COARSE side. Crack-freedom
+      // therefore needs: fully morphed by 1.18·own splitDist AND unmorphed
+      // until past 1.0·own splitDist — i.e. the band lives just ABOVE the
+      // tile's split onset, NOT below it (the original [0.7, 0.95] band made
+      // coarse tiles start morphing toward the GRANDPARENT while fine
+      // neighbors still touched them: the residual T-junction dashes).
+      'float ggMorph = smoothstep( 1.01 * uSplitDist, 1.16 * uSplitDist, distance( position, uLodCamLocal ) );\n' +
         'vec3 transformed = mix( vec3( position ), aParentPos, ggMorph );',
     );
 }
