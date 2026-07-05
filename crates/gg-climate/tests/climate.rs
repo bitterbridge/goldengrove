@@ -366,6 +366,37 @@ fn info_reports_mean_temp_and_ice_fraction() {
 }
 
 #[test]
+fn golden_biome_hashes_are_pinned() {
+    for seed in [1u64, 42, 123_456_789] {
+        let path = format!("tests/golden/biome-seed-{seed}.json");
+        let expected = std::fs::read_to_string(&path).unwrap_or_else(|_| {
+            panic!("missing {path}; bootstrap: cargo run -p gg-climate --example biome_hashes -- {seed} > crates/gg-climate/{path}")
+        });
+        let expected: std::collections::BTreeMap<String, String> =
+            serde_json::from_str(&expected).unwrap();
+        let desc = generate(seed);
+        let total = desc.stars.len()
+            + desc.planets.len()
+            + desc.planets.iter().map(|p| p.moons.len()).sum::<usize>();
+        let mut actual = std::collections::BTreeMap::new();
+        for body in 0..total {
+            if let Some(terrain) = gg_terrain::TerrainSpec::for_body(seed, &desc, body) {
+                if let Some(spec) = gg_climate::ClimateSpec::for_body(&desc, body, &terrain) {
+                    actual.insert(
+                        format!("body_{body}"),
+                        format!(
+                            "{:#018x}",
+                            gg_climate::biome_hash(&spec.biome_grid(&terrain, 256, 128))
+                        ),
+                    );
+                }
+            }
+        }
+        assert_eq!(actual, expected, "seed {seed}: biome classification diverged — shared worlds would change; this is the biome determinism contract");
+    }
+}
+
+#[test]
 fn biome_hash_is_deterministic_and_sensitive() {
     let (desc, idx) = anchor(42);
     let terrain = gg_terrain::TerrainSpec::for_body(42, &desc, idx).unwrap();

@@ -31,6 +31,9 @@ function fakeSim(): Sim {
       for (let i = 0; i < out.length; i++) out[i] = 100 * Math.sin(coords[2 * i]! * 0.5); // smooth, lat-dependent
       return out;
     },
+    bodyBiomeGrid: () => new Uint8Array(0),
+    bodyBiomes: (_: number, coords: Float64Array) => new Uint8Array(coords.length / 2),
+    bodyClimateInfo: () => null,
   };
 }
 

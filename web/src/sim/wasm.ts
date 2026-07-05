@@ -1,6 +1,6 @@
 import init, { World } from '../wasm/pkg/gg_wasm.js';
 import { parseDescriptor } from './parse';
-import type { DateTime, SystemDescriptor, TerrainInfo } from './types';
+import type { ClimateInfo, DateTime, SystemDescriptor, TerrainInfo } from './types';
 
 export interface Sim {
   seed: string;
@@ -16,6 +16,11 @@ export interface Sim {
   bodyElevation(bodyIndex: number, latDeg: number, lonDeg: number): number | null;
   /** Batched fine elevations for [lat0, lon0, ...] pairs; length 0 for non-terrain bodies. */
   bodyElevations(bodyIndex: number, coords: Float64Array): Float32Array;
+  /** Equirect biome classification grid (u8 per cell); length 0 => no climate. */
+  bodyBiomeGrid(bodyIndex: number, width: number, height: number): Uint8Array;
+  /** Batched biome classification for [lat0, lon0, ...] pairs; length 0 for bodies with no climate. */
+  bodyBiomes(bodyIndex: number, coords: Float64Array): Uint8Array;
+  bodyClimateInfo(bodyIndex: number): ClimateInfo | null; // null => no climate
 }
 
 let wasmReady: Promise<unknown> | null = null;
@@ -57,5 +62,14 @@ export async function loadSim(seed: string): Promise<Sim> {
       }
     },
     bodyElevations: (i, coords) => world.body_elevations(i, coords),
+    bodyBiomeGrid: (i, w, h) => world.body_biome_grid(i, w, h),
+    bodyBiomes: (i, coords) => world.body_biomes(i, coords),
+    bodyClimateInfo: (i) => {
+      try {
+        return JSON.parse(world.body_climate_info(i)) as ClimateInfo;
+      } catch {
+        return null;
+      }
+    },
   };
 }

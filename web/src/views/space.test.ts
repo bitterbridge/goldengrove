@@ -59,6 +59,9 @@ function fakeSim(): Sim {
     bodyTerrainInfo: () => null,
     bodyElevation: () => 0,
     bodyElevations: (_: number, coords: Float64Array) => new Float32Array(coords.length / 2),
+    bodyBiomeGrid: () => new Uint8Array(0),
+    bodyBiomes: (_: number, coords: Float64Array) => new Uint8Array(coords.length / 2),
+    bodyClimateInfo: () => null,
   };
   return fake;
 }
@@ -122,6 +125,9 @@ function fakeSimWithDisplacedStars(): Sim {
     bodyTerrainInfo: () => null,
     bodyElevation: () => 0,
     bodyElevations: (_: number, coords: Float64Array) => new Float32Array(coords.length / 2),
+    bodyBiomeGrid: () => new Uint8Array(0),
+    bodyBiomes: (_: number, coords: Float64Array) => new Uint8Array(coords.length / 2),
+    bodyClimateInfo: () => null,
   };
   return fake;
 }

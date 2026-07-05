@@ -85,6 +85,7 @@ dependencies = [
  "gg-gen",
  "gg-terrain",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -128,6 +129,7 @@ dependencies = [
 name = "gg-wasm"
 version = "0.1.0"
 dependencies = [
+ "gg-climate",
  "gg-core",
  "gg-ephemeris",
  "gg-gen",

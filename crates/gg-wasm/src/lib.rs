@@ -29,6 +29,11 @@ pub struct World {
     // and avoids the overhead of atomic locking for what is effectively a
     // per-call memoization cache keyed by body index.
     terrain: RefCell<HashMap<usize, Option<gg_terrain::TerrainSpec>>>,
+    // Separate cache/RefCell from `terrain`: ClimateSpec doesn't own a
+    // TerrainSpec (its methods borrow one per call), so climate lookups
+    // borrow both caches sequentially — never nested mutable borrows of the
+    // same cell. See `with_climate`.
+    climate: RefCell<HashMap<usize, Option<gg_climate::ClimateSpec>>>,
 }
 
 #[wasm_bindgen]
@@ -44,6 +49,7 @@ impl World {
             eph: KeplerSecular::new(gg_gen::generate(seed)),
             seed,
             terrain: RefCell::new(HashMap::new()),
+            climate: RefCell::new(HashMap::new()),
         })
     }
 
@@ -138,6 +144,66 @@ impl World {
         self.with_terrain(body_index, |spec| match spec {
             Some(s) => js_sys::Float32Array::from(s.elevation_fine_batch(coords).as_slice()),
             None => js_sys::Float32Array::new_with_length(0),
+        })
+    }
+
+    /// Ensures the terrain entry exists first (a separate RefCell, borrowed
+    /// then dropped), then borrows `terrain` (immutable) and `climate`
+    /// (mutable) sequentially — never nested mutable borrows of the same
+    /// cell. `ClimateSpec` doesn't own a `TerrainSpec`, so callers get both
+    /// references together.
+    fn with_climate<R>(
+        &self,
+        body_index: usize,
+        f: impl FnOnce(Option<(&gg_climate::ClimateSpec, &gg_terrain::TerrainSpec)>) -> R,
+    ) -> R {
+        self.with_terrain(body_index, |_| {});
+
+        let terrain_cache = self.terrain.borrow();
+        let terrain = terrain_cache.get(&body_index).and_then(|t| t.as_ref());
+
+        let mut climate_cache = self.climate.borrow_mut();
+        let climate_entry = climate_cache.entry(body_index).or_insert_with(|| {
+            terrain.and_then(|t| gg_climate::ClimateSpec::for_body(self.eph.desc(), body_index, t))
+        });
+
+        match (climate_entry.as_ref(), terrain) {
+            (Some(c), Some(t)) => f(Some((c, t))),
+            _ => f(None),
+        }
+    }
+
+    /// Equirect biome classification grid (u8 per cell, row 0 = lat +90).
+    /// Empty array = no climate for this body.
+    pub fn body_biome_grid(&self, body_index: usize, w: usize, h: usize) -> js_sys::Uint8Array {
+        self.with_climate(body_index, |data| match data {
+            Some((spec, terrain)) => {
+                js_sys::Uint8Array::from(spec.biome_grid(terrain, w, h).as_slice())
+            }
+            None => js_sys::Uint8Array::new_with_length(0),
+        })
+    }
+
+    /// Batched biome classification: coords = [lat0, lon0, lat1, lon1, ...]
+    /// deg. Empty array = no climate for this body, matching body_biome_grid.
+    pub fn body_biomes(&self, body_index: usize, coords: &[f64]) -> js_sys::Uint8Array {
+        self.with_climate(body_index, |data| match data {
+            Some((spec, terrain)) => {
+                let out: Vec<u8> = coords
+                    .chunks_exact(2)
+                    .map(|pair| spec.biome(terrain, pair[0], pair[1]) as u8)
+                    .collect();
+                js_sys::Uint8Array::from(out.as_slice())
+            }
+            None => js_sys::Uint8Array::new_with_length(0),
+        })
+    }
+
+    pub fn body_climate_info(&self, body_index: usize) -> Result<String, JsError> {
+        self.with_climate(body_index, |data| match data {
+            Some((spec, _)) => serde_json::to_string(&spec.info())
+                .map_err(|e| JsError::new(&format!("climate info serialization failed: {e}"))),
+            None => Err(JsError::new("no climate for this body")),
         })
     }
 }
