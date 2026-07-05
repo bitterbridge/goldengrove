@@ -45,10 +45,10 @@ git history, not here.
 
 ## Climate & life (the next big generation stage)
 
-16. Climate model — insolation from the actual orbit (axial tilt,
+16. ~~Climate model~~ SHIPPED 2026-07-05 (gg-climate; seasons deferred) — was: insolation from the actual orbit (axial tilt,
     eccentricity → real seasons), latitude bands, rain shadow from the
     mountains we already generate.
-17. Biome palettes — climate × elevation → tundra/desert/forest coloring;
+17. ~~Biome palettes~~ SHIPPED 2026-07-05 (13 classes, both views) — was: climate × elevation → tundra/desert/forest coloring;
     dead and doomed worlds get their own looks.
 18. Ocean currents & wind — named in the v1 spec's future list; feeds climate.
 19. Weather in ground view — clouds and haze tied to atmosphere density.
