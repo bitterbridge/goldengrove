@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { TILE_QUADS, tileCenterUnit, tileEdgeLenM, type TileId } from './cubeSphere';
 import { buildTileMesh, type TileMeshInputs } from './tileMesh';
+import { biomeColor } from './biomePalette';
+import { hypsometricColor } from './terrainTexture';
 
 const R = 6.371e6;
-const inputs: TileMeshInputs = { radiusM: R, reliefM: 6000, classTint: [155, 143, 122], dead: false, verticalScale: 1 };
+const inputs: TileMeshInputs = {
+  radiusM: R,
+  reliefM: 6000,
+  classTint: [155, 143, 122],
+  dead: false,
+  verticalScale: 1,
+  biomes: null,
+};
 const t: TileId = { face: 0, level: 6, ix: 30, iy: 31 };
 const n = TILE_QUADS + 1;
 const gridCount = n * n;
@@ -178,5 +187,49 @@ describe('buildTileMesh', () => {
     // first skirt vertex sources grid vertex 0 (ring starts at row 0, col 0)
     const s = gridCount;
     expect(radiusOf(m.parentPositions, s)).toBeCloseTo(radiusOf(m.parentPositions, 0) - depth, 2);
+  });
+
+  it('null biomes keeps the exact pre-change hypsometric vertex colors', () => {
+    // Regression: captures the CURRENT (pre-biome) color formula directly,
+    // so any accidental short-circuit or scaling change in the null path
+    // trips this test even though the underlying ramp itself is unchanged.
+    const m = buildTileMesh(t, flat(1234), { ...inputs, biomes: null });
+    const [r, g, b] = hypsometricColor(1234 / inputs.reliefM, 1.0, inputs.classTint, inputs.dead);
+    expect(m.colors[0]).toBeCloseTo(r / 255, 6);
+    expect(m.colors[1]).toBeCloseTo(g / 255, 6);
+    expect(m.colors[2]).toBeCloseTo(b / 255, 6);
+    // skirt vertex (sources grid vertex 0) matches too
+    expect(m.colors[3 * gridCount]).toBeCloseTo(r / 255, 6);
+    expect(m.colors[3 * gridCount + 1]).toBeCloseTo(g / 255, 6);
+    expect(m.colors[3 * gridCount + 2]).toBeCloseTo(b / 255, 6);
+  });
+
+  it('vertex colors follow the biome palette per-vertex when a biomes array is supplied', () => {
+    const biomes = new Uint8Array(gridCount);
+    biomes[0] = 7; // Grassland
+    biomes[gridCount - 1] = 10; // HotDesert
+    const m = buildTileMesh(t, flat(500), { ...inputs, biomes });
+
+    const [gr, gg, gb] = biomeColor(7, 1.0);
+    expect(m.colors[0]).toBeCloseTo(gr / 255, 5);
+    expect(m.colors[1]).toBeCloseTo(gg / 255, 5);
+    expect(m.colors[2]).toBeCloseTo(gb / 255, 5);
+
+    const last = gridCount - 1;
+    const [dr, dg, db] = biomeColor(10, 1.0);
+    expect(m.colors[3 * last]).toBeCloseTo(dr / 255, 5);
+    expect(m.colors[3 * last + 1]).toBeCloseTo(dg / 255, 5);
+    expect(m.colors[3 * last + 2]).toBeCloseTo(db / 255, 5);
+  });
+
+  it('skirt vertices copy their source grid vertex biome color', () => {
+    const biomes = new Uint8Array(gridCount).fill(7); // Grassland everywhere
+    const m = buildTileMesh(t, flat(500), { ...inputs, biomes });
+    const [r, g, b] = biomeColor(7, 1.0);
+    for (const s of [gridCount, gridCount + skirtCount - 1]) {
+      expect(m.colors[3 * s]).toBeCloseTo(r / 255, 5);
+      expect(m.colors[3 * s + 1]).toBeCloseTo(g / 255, 5);
+      expect(m.colors[3 * s + 2]).toBeCloseTo(b / 255, 5);
+    }
   });
 });

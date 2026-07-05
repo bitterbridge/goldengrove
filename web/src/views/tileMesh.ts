@@ -4,6 +4,7 @@
  * buffers never carry planet-scale magnitudes (no vertex jitter). */
 import { TILE_QUADS, tileCenterUnit, tileEdgeLenM, tileGrid, type TileId } from './cubeSphere';
 import { hypsometricColor } from './terrainTexture';
+import { biomeColor } from './biomePalette';
 
 export interface TileMeshInputs {
   radiusM: number;
@@ -11,6 +12,11 @@ export interface TileMeshInputs {
   classTint: [number, number, number];
   dead: boolean;
   verticalScale: number;
+  /** Per-vertex biome classification (same layout as the elevation grid,
+   * grid vertices only — skirt vertices look up their source grid index).
+   * null means no climate data (dead worlds, or a sim that hasn't produced
+   * one): keep the existing hypsometric elevation-tint colors exactly. */
+  biomes: Uint8Array | null;
 }
 
 export interface TileMeshData {
@@ -69,7 +75,9 @@ export function buildTileMesh(t: TileId, elevationsM: Float32Array, inputs: Tile
     positions[3 * out] = ux * r - originBf[0];
     positions[3 * out + 1] = uy * r - originBf[1];
     positions[3 * out + 2] = uz * r - originBf[2];
-    const [cr, cg, cb] = hypsometricColor(elevationsM[gi]! / inputs.reliefM, 1.0, inputs.classTint, inputs.dead);
+    const [cr, cg, cb] = inputs.biomes
+      ? biomeColor(inputs.biomes[gi]!, 1.0)
+      : hypsometricColor(elevationsM[gi]! / inputs.reliefM, 1.0, inputs.classTint, inputs.dead);
     colors[3 * out] = cr / 255;
     colors[3 * out + 1] = cg / 255;
     colors[3 * out + 2] = cb / 255;

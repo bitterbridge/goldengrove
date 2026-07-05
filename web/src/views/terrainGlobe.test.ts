@@ -8,6 +8,7 @@ import { bodyLayout, bodyRadiusM } from '../sim/layout';
 import type { Sim } from '../sim/wasm';
 import { TILE_QUADS, tileEdgeLenM } from './cubeSphere';
 import { buildTerrainGlobe, SPLIT_K } from './terrainGlobe';
+import { biomeColor } from './biomePalette';
 
 const golden = parseDescriptor(
   readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../crates/gg-gen/tests/golden/seed-42.json'), 'utf8'),
@@ -339,5 +340,52 @@ describe('buildTerrainGlobe', () => {
     const wx = wo[0] + wp.getX(0), wy = wo[1] + wp.getY(0), wz = wo[2] + wp.getZ(0);
     const waterRadius = Math.hypot(wx, wy, wz);
     expect(Math.abs(waterRadius - R)).toBeLessThan(1);
+  });
+
+  it('grounds terrain tiles in biome colors when the sim reports a classification', () => {
+    const sim = fakeSim();
+    const biomeSim: Sim = {
+      ...sim,
+      bodyBiomes: (_: number, coords: Float64Array) => new Uint8Array(coords.length / 2).fill(7), // Grassland
+    };
+    const g = buildTerrainGlobe(biomeSim, anchorBody)!;
+    for (let f = 0; f < 40; f++) g.update(15, 30, 0, 252, suns, 8);
+
+    let mesh: THREE.Mesh | undefined;
+    g.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!mesh && m.isMesh && m.visible && !(m.material as THREE.Material).transparent) mesh = m;
+    });
+    expect(mesh).toBeDefined();
+
+    const color = mesh!.geometry.getAttribute('color');
+    const [r, gg, b] = biomeColor(7, 1.0);
+    expect(color.getX(0)).toBeCloseTo(r / 255, 2);
+    expect(color.getY(0)).toBeCloseTo(gg / 255, 2);
+    expect(color.getZ(0)).toBeCloseTo(b / 255, 2);
+  });
+
+  it('leaves tiles on the hypsometric ramp when the sim reports no classification', () => {
+    const sim = fakeSim();
+    const noBiomeSim: Sim = { ...sim, bodyBiomes: (_: number, coords: Float64Array) => new Uint8Array(0) };
+    const g = buildTerrainGlobe(noBiomeSim, anchorBody)!;
+    for (let f = 0; f < 40; f++) g.update(15, 30, 0, 252, suns, 8);
+
+    let mesh: THREE.Mesh | undefined;
+    g.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!mesh && m.isMesh && m.visible && !(m.material as THREE.Material).transparent) mesh = m;
+    });
+    expect(mesh).toBeDefined();
+
+    const color = mesh!.geometry.getAttribute('color');
+    const [r, gg, b] = biomeColor(7, 1.0);
+    // must NOT match the grassland palette row (the dead-simple regression
+    // guard: an empty biomes array must fall back to hypsometric colors)
+    const matchesGrassland =
+      Math.abs(color.getX(0) - r / 255) < 1e-3 &&
+      Math.abs(color.getY(0) - gg / 255) < 1e-3 &&
+      Math.abs(color.getZ(0) - b / 255) < 1e-3;
+    expect(matchesGrassland).toBe(false);
   });
 });
