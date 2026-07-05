@@ -6,8 +6,8 @@ import * as THREE from 'three';
 import { parseDescriptor } from '../sim/parse';
 import { bodyLayout, bodyRadiusM } from '../sim/layout';
 import type { Sim } from '../sim/wasm';
-import { TILE_QUADS } from './cubeSphere';
-import { buildTerrainGlobe } from './terrainGlobe';
+import { TILE_QUADS, tileEdgeLenM } from './cubeSphere';
+import { buildTerrainGlobe, SPLIT_K } from './terrainGlobe';
 
 const golden = parseDescriptor(
   readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../crates/gg-gen/tests/golden/seed-42.json'), 'utf8'),
@@ -225,7 +225,9 @@ describe('buildTerrainGlobe', () => {
     expect(high.stats().deepestBuilt).toBe(flat.stats().deepestBuilt);
   });
 
-  it('terrain tiles carry aParentPos and a per-tile morph uniform', () => {
+  it('terrain tiles carry aParentPos and a static per-tile split-distance uniform', () => {
+    const ref = bodyLayout(golden)[anchorBody]!;
+    const R = ref.kind === 'star' ? 0 : bodyRadiusM(golden, ref);
     const g = buildTerrainGlobe(fakeSim(), anchorBody)!;
     for (let f = 0; f < 40; f++) g.update(15, 30, 252, 2, suns, 8);
     let checked = 0;
@@ -233,22 +235,36 @@ describe('buildTerrainGlobe', () => {
       const m = o as THREE.Mesh;
       if (!m.isMesh || !m.visible || (m.material as THREE.Material).transparent) return;
       expect(m.geometry.getAttribute('aParentPos')).toBeTruthy();
-      expect(m.userData.uMorph).toBeTruthy();
+      const uSplitDist = m.userData.uSplitDist as { value: number } | undefined;
+      expect(uSplitDist).toBeTruthy();
+      const level = m.userData.level as number;
+      expect(uSplitDist!.value).toBeCloseTo(SPLIT_K * tileEdgeLenM(level, R), 6);
       checked++;
     });
     expect(checked).toBeGreaterThan(3);
   });
 
-  it('uMorph rises with distance: far tiles morph toward the parent shape', () => {
+  it('uSplitDist halves as level increases by one (static, set once at build)', () => {
     const g = buildTerrainGlobe(fakeSim(), anchorBody)!;
     for (let f = 0; f < 60; f++) g.update(15, 30, 252, 2, suns, 8);
-    const morphs: number[] = [];
+    const byLevel = new Map<number, number>();
     g.scene.traverse((o) => {
       const m = o as THREE.Mesh;
-      if (m.isMesh && m.visible && m.userData.uMorph) morphs.push(m.userData.uMorph.value as number);
+      if (m.isMesh && m.visible && m.userData.uSplitDist) {
+        byLevel.set(m.userData.level as number, (m.userData.uSplitDist as { value: number }).value);
+      }
     });
-    expect(Math.max(...morphs)).toBeGreaterThan(0.5); // outer-band tiles well into their morph
-    expect(Math.min(...morphs)).toBeLessThan(0.5); // underfoot tiles barely morphed
+    const levels = [...byLevel.keys()].sort((a, b) => a - b);
+    expect(levels.length).toBeGreaterThan(1);
+    let foundAdjacentPair = false;
+    for (let i = 0; i < levels.length - 1; i++) {
+      const [a, b] = [levels[i]!, levels[i + 1]!];
+      if (b !== a + 1) continue;
+      expect(byLevel.get(a)! / byLevel.get(b)!).toBeCloseTo(2, 6);
+      foundAdjacentPair = true;
+      break;
+    }
+    expect(foundAdjacentPair).toBe(true);
   });
 
   it('reliefScale=3 raises the rendered surface but not water', () => {
