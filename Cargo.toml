@@ -1,3 +1,9 @@
 [workspace]
 members = ["crates/gg-core", "crates/gg-gen", "crates/gg-ephemeris", "crates/gg-wasm", "crates/gg-terrain", "crates/gg-climate"]
 resolver = "2"
+
+# Noise-heavy golden tests (terrain, fine, biome) are ~20x slower at
+# opt-level 0; optimizing test builds keeps CI wall time sane without
+# touching any determinism surface (hashes are profile-independent).
+[profile.test]
+opt-level = 2
